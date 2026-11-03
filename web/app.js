@@ -5,7 +5,7 @@ const STATE_LABELS = {won:'승리',lost:'실패',draw:'무승부',finished:'완�
 const INITIAL = [...'ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ'];
 const VOWELS = ['ㅏ','ㅐ','ㅑ','ㅒ','ㅓ','ㅔ','ㅕ','ㅖ','ㅗ','ㅗㅏ','ㅗㅐ','ㅗㅣ','ㅛ','ㅜ','ㅜㅓ','ㅜㅔ','ㅜㅣ','ㅠ','ㅡ','ㅡㅣ','ㅣ'];
 const FINAL = ['','ㄱ','ㄲ','ㄱㅅ','ㄴ','ㄴㅈ','ㄴㅎ','ㄷ','ㄹ','ㄹㄱ','ㄹㅁ','ㄹㅂ','ㄹㅅ','ㄹㅌ','ㄹㅍ','ㄹㅎ','ㅁ','ㅂ','ㅂㅅ','ㅅ','ㅆ','ㅇ','ㅈ','ㅊ','ㅋ','ㅌ','ㅍ','ㅎ'];
-let config, state, language='ko', mode=0, length=5, busy=false, composing=false, receivedAt=0, ws, syncTimer, pending=null, lastBoard='', lastGame='', lastPuzzle='', toastTimer;
+let config, state, language='ko', mode=0, length=5, busy=false, composing=false, receivedAt=0, ws, syncTimer, pending=null, lastBoard='', lastGame='', lastPuzzle='', toastTimer, errorUntil=0;
 function splitWord(text,lang=language){
   text=text.trim().normalize('NFC');
   if(lang==='en') return /^[a-z]*$/i.test(text)?[...text.toLowerCase()]:null;
@@ -15,7 +15,7 @@ function splitWord(text,lang=language){
 }
 function node(tag,text,className){const el=document.createElement(tag);if(text!==undefined)el.textContent=text;if(className)el.className=className;return el;}
 function toast(text){$('toast').textContent=text;$('toast').hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('toast').hidden=true,4500);}
-function message(text,error=false){$('game-message').textContent=text;$('game-message').classList.toggle('error',error);}
+function message(text,error=false){if(error)errorUntil=Date.now()+4000;else if(Date.now()<errorUntil)return;$('game-message').textContent=text;$('game-message').classList.toggle('error',error);}
 function connected(ok,text){$('connection-dot').className=`dot ${ok?'online':'offline'}`;$('connection-text').textContent=text;}
 async function api(path,body){
   const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),20000);
@@ -24,6 +24,7 @@ async function api(path,body){
 }
 function apply(data){
   if(!data||!('game' in data))return;
+  if(state&&data.sequence<state.sequence)return;
   state=data;receivedAt=performance.now();$('nickname').textContent=data.nickname;
   const g=data.game;
   if(g&&g.id!==lastGame){lastGame=g.id;lastPuzzle=g.puzzle_id;$('guess').value='';language=g.language;length=g.length;mode=g.mode;updateSettings();}
