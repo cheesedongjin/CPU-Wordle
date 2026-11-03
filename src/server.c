@@ -37,7 +37,7 @@ typedef struct {
 static User users[USERS];static Game games[GAMES];
 static pthread_mutex_t state_lock=PTHREAD_MUTEX_INITIALIZER;
 static volatile sig_atomic_t stopping;
-static char origin[256];static int production;
+static char origin[256],boot_id[33];static int production;
 static int duration_ms=180000,grace_ms=30000,countdown_ms=3000;
 static int64_t version;
 static struct mg_context *ctx;
@@ -85,7 +85,7 @@ static void tick(int64_t now){
     }
 }
 static cJSON *snapshot(int uid){
-    User *u=&users[uid];cJSON *j=cJSON_CreateObject();addstr(j,"user_id",u->id);addstr(j,"nickname",u->name);addnum(j,"sequence",(double)version);cJSON_AddBoolToObject(j,"queued",u->queued);
+    User *u=&users[uid];cJSON *j=cJSON_CreateObject();addstr(j,"boot_id",boot_id);addstr(j,"user_id",u->id);addstr(j,"nickname",u->name);addnum(j,"sequence",(double)version);cJSON_AddBoolToObject(j,"queued",u->queued);
     if(u->game<0||!games[u->game].used){cJSON_AddNullToObject(j,"game");return j;}
     Game *g=&games[u->game];int s=side(g,uid);Player *p=&g->p[s];int64_t now=now_ms();
     cJSON *v=cJSON_AddObjectToObject(j,"game");addstr(v,"id",g->id);addstr(v,"puzzle_id",g->puzzle);addnum(v,"mode",g->mode);addstr(v,"language",g->lang?"en":"ko");addnum(v,"length",g->length);addnum(v,"round",g->round);addnum(v,"solved",p->solved);addnum(v,"score",p->points);addnum(v,"attempts",p->attempts);addnum(v,"total_guesses",p->total);
@@ -229,6 +229,7 @@ static void *maintenance(void *arg){
     }return NULL;
 }
 int main(void){
+    random_hex(boot_id,16);
     const char *port=getenv("PORT");if(!port)port="8080";production=getenv("PRODUCTION")&&!strcmp(getenv("PRODUCTION"),"1");
     const char *configured=getenv("APP_ORIGIN");if(!configured)configured=getenv("RENDER_EXTERNAL_URL");if(configured)snprintf(origin,sizeof(origin),"%s",configured);else snprintf(origin,sizeof(origin),"http://localhost:%s",port);
     if(production&&strncmp(origin,"https://",8)){fprintf(stderr,"Production requires HTTPS APP_ORIGIN or RENDER_EXTERNAL_URL\n");return 1;}

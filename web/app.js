@@ -24,7 +24,8 @@ async function api(path,body){
 }
 function apply(data){
   if(!data||!('game' in data))return;
-  if(state&&data.sequence<state.sequence)return;
+  if(state?.boot_id===data.boot_id&&state&&data.sequence<state.sequence)return;
+  if(state?.boot_id&&state.boot_id!==data.boot_id&&state.game?.status!=='finished'&&state.game)toast('서버가 재시작되어 진행 중 게임이 종료되었습니다. 완료된 기록은 보존됩니다.');
   state=data;receivedAt=performance.now();$('nickname').textContent=data.nickname;
   const g=data.game;
   if(g&&g.id!==lastGame){lastGame=g.id;lastPuzzle=g.puzzle_id;$('guess').value='';language=g.language;length=g.length;mode=g.mode;updateSettings();}
