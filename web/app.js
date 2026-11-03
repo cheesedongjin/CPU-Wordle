@@ -36,7 +36,7 @@ async function action(path,body={}){
   if(pending&&(pending.path!==path||JSON.stringify(pending.input)!==JSON.stringify(body))){toast('먼저 이전 요청의 처리를 확인해 주세요. 같은 동작을 다시 눌러 재시도할 수 있습니다.');return;}
   busy=true;renderControls();
   const req=pending||{path,input:body,body:{...body,request_id:crypto.randomUUID()}};pending=req;
-  try{const data=await api(path,req.body);pending=null;if(path==='guess')$('guess').value='';apply(data);connected(true,'서버와 연결되었습니다');if(path==='guess'&&data.last_guess)toast(data.last_guess.solved?'정답! 다음 문제로 이어갑니다.':'6번의 기회를 사용했어요. 다음 문제로 이어갑니다.');return data;}
+  try{const data=await api(path,req.body);pending=null;if(path==='guess')$('guess').value='';apply(data);connected(true,'서버와 연결되었습니다');if(path==='guess'&&data.last_guess)toast(data.game?.status==='finished'?'타임어택을 완료했습니다!':data.last_guess.solved?'정답! 다음 문제로 이어갑니다.':'6번의 기회를 사용했어요. 다음 문제로 이어갑니다.');return data;}
   catch(e){if(e.status)pending=null;message(e.status?e.message:'연결이 지연되고 있습니다. 같은 버튼을 눌러 안전하게 재시도하세요.',true);toast(e.status?e.message:'서버가 깨어나는 중일 수 있습니다. 잠시 후 같은 요청을 다시 시도하세요.');}
   finally{busy=false;renderControls();if(state?.game?.status==='active')$('guess').focus();}
 }
@@ -75,6 +75,7 @@ function render(){
   $('result').hidden=g?.status!=='finished';
   if(g?.status==='finished'){
     const result=$('result');result.replaceChildren(node('h3',g.mode===1?`${g.solved}개 정답, ${g.score}점`:(g.outcome==='won'?'멋져요, 정답입니다!':g.outcome==='draw'?'좋은 승부였어요. 무승부!':g.outcome==='lost'?'아쉬워요. 다시 도전해 볼까요?':STATE_LABELS[g.outcome]||'게임 종료')));
+    if(g.mode===2&&g.outcome==='won')result.firstElementChild.textContent='대전에서 승리했어요!';
     result.append(node('p',`정답은 ‘${g.answer}’`));const reasons={timeout:'제한 시간이 끝났습니다.',attempts_exhausted:'6번의 기회를 모두 사용했습니다.',pool_exhausted:'이 길이의 모든 출제 단어를 풀었습니다.',disconnected:'재접속 유예 시간이 끝났습니다.',forfeit:'기권으로 종료되었습니다.',abandoned:'중도 종료한 게임입니다.'};
     if(reasons[g.reason])result.append(node('p',reasons[g.reason]));result.append(node('small',g.saved?'기록 저장 완료':'기록 저장 중…'));
     message('다른 길이나 모드를 선택해 다시 도전해 보세요.');
@@ -85,7 +86,7 @@ function render(){
   renderControls();renderBoard();preview();updateTimer();
 }
 function preview(){const g=state?.game;const tokens=splitWord($('guess').value,g?.language||language);$('token-preview').textContent=$('guess').value?(tokens?tokens.join(' '):'완성된 단어를 입력하세요'):(language==='ko'?'사과 → ㅅ ㅏ ㄱ ㅗ ㅏ':'apple → a p p l e');$('token-count').textContent=`${tokens?.length||0} / ${g?.length||length}`;renderBoard();}
-function updateTimer(){const g=state?.game;if(!g)return;const dt=performance.now()-receivedAt;const remaining=Math.max(0,g.remaining_ms-dt);const sec=Math.ceil(remaining/1000);$('timer').textContent=`${String(Math.floor(sec/60)).padStart(2,'0')}:${String(sec%60).padStart(2,'0')}`;if(g.status==='countdown'){const n=Math.max(0,Math.ceil((g.countdown_ms-dt)/1000));message(n?`${n}초 뒤 시작합니다. 준비하세요!`:'시작 상태를 확인하고 있습니다…');}}
+function updateTimer(){const g=state?.game;if(!g)return;const dt=performance.now()-receivedAt;const remaining=Math.max(0,Math.min((config?.duration_seconds||180)*1000,g.remaining_ms-dt));const sec=Math.ceil(remaining/1000);$('timer').textContent=`${String(Math.floor(sec/60)).padStart(2,'0')}:${String(sec%60).padStart(2,'0')}`;if(g.status==='countdown'){const n=Math.max(0,Math.ceil((g.countdown_ms-dt)/1000));message(n?`${n}초 뒤 시작합니다. 준비하세요!`:'시작 상태를 확인하고 있습니다…');}}
 function openDialog(title){$('dialog-title').textContent=title;$('dialog-content').replaceChildren();if(!$('dialog').open)$('dialog').showModal();return $('dialog-content');}
 function help(){const box=openDialog('게임 방법');for(const [title,copy] of [
   ['6번 안에 단어를 찾아보세요','초록은 글자와 위치가 일치, 노랑은 글자만 일치, 회색은 정답에 남아 있는 같은 글자가 없다는 뜻입니다. 같은 글자는 정답에 있는 개수만큼만 색칠됩니다.'],

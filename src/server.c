@@ -25,6 +25,7 @@ typedef struct {
 typedef struct {Word word;int tiles[MAX_TOKENS];} Guess;
 typedef struct {
     int user,attempts,total,solved,points,exhausted,saved;
+    char user_id[33];
     Guess guesses[6]; char outcome[24];
 } Player;
 typedef struct {
@@ -101,8 +102,8 @@ static int make_game(int uid,int opponent,int mode,int lang,int length){
     Game *g=&games[slot];memset(g,0,sizeof(*g));g->pool_count=answer_indices(lang,length,g->pool);if(!g->pool_count)return 0;
     for(int i=g->pool_count-1;i>0;i--){int n=(int)random_below((unsigned)i+1);int tmp=g->pool[i];g->pool[i]=g->pool[n];g->pool[n]=tmp;}
     g->used=1;g->mode=mode;g->lang=lang;g->length=length;g->start=now_ms()+(mode==2?countdown_ms:0);g->end=g->start+duration_ms;
-    random_hex(g->id,16);g->p[0].user=uid;g->p[1].user=opponent;next_puzzle(g);users[uid].game=slot;users[uid].queued=0;
-    if(opponent>=0){users[opponent].game=slot;users[opponent].queued=0;}version++;return 1;
+    random_hex(g->id,16);g->p[0].user=uid;g->p[1].user=opponent;snprintf(g->p[0].user_id,sizeof(g->p[0].user_id),"%s",users[uid].id);next_puzzle(g);users[uid].game=slot;users[uid].queued=0;
+    if(opponent>=0){snprintf(g->p[1].user_id,sizeof(g->p[1].user_id),"%s",users[opponent].id);users[opponent].game=slot;users[opponent].queued=0;}version++;return 1;
 }
 static cJSON *config_json(void){cJSON *j=cJSON_CreateObject();addstr(j,"version","v1");addnum(j,"duration_seconds",duration_ms/1000);cJSON *langs=cJSON_AddObjectToObject(j,"languages");for(int l=0;l<2;l++){cJSON *a=cJSON_AddArrayToObject(langs,l?"en":"ko");for(int n=5;n<=(l?8:12);n++){int indices[MAX_ANSWERS],count=answer_indices(l,n,indices);if(count){cJSON *o=cJSON_CreateObject();addnum(o,"length",n);addnum(o,"answers",count);cJSON_AddItemToArray(a,o);}}}return j;}
 static cJSON *mutate(int uid,const char *action,cJSON *body,int *status){
@@ -216,9 +217,9 @@ static void *maintenance(void *arg){
         for(int i=0;i<GAMES;i++)for(int s=0;s<2;s++){
             pthread_mutex_lock(&state_lock);Game *g=&games[i];
             if(!g->used||!g->done||s>(g->mode==2?1:0)||g->p[s].saved){pthread_mutex_unlock(&state_lock);continue;}
-            Game copy=*g;char uid[33];snprintf(uid,sizeof(uid),"%s",users[g->p[s].user].id);pthread_mutex_unlock(&state_lock);
+            Game copy=*g;pthread_mutex_unlock(&state_lock);
             Player *p=&copy.p[s];int elapsed=(int)(copy.finished>copy.start?copy.finished-copy.start:0);
-            int ok=storage_result(copy.id,uid,copy.mode,copy.lang,copy.length,p->solved,p->total,elapsed,p->outcome,p->points);
+            int ok=storage_result(copy.id,p->user_id,copy.mode,copy.lang,copy.length,p->solved,p->total,elapsed,p->outcome,p->points);
             pthread_mutex_lock(&state_lock);if(g->used&&!strcmp(g->id,copy.id)&&ok)g->p[s].saved=1;pthread_mutex_unlock(&state_lock);
         }
         pthread_mutex_lock(&state_lock);int64_t now=now_ms();

@@ -2,6 +2,8 @@
 
 한글 자모와 영어로 즐기는 C 기반 웹 워들입니다. 클래식, 180초 타임어택, 2인 실시간 대전, 개인 기록과 리더보드를 제공합니다.
 
+**플레이:** [https://cpu-wordle.onrender.com](https://cpu-wordle.onrender.com)
+
 ## 실행
 
 Docker Desktop 또는 Docker Engine이 실행된 환경에서:
