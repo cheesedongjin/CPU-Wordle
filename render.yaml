@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: cpu-wordle
+    runtime: docker
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: PRODUCTION
+        value: "1"
+      - key: PORT
+        value: "10000"

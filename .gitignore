@@ -1,1 +1,7 @@
-/.cache
+.cache/
+.env
+build/
+__pycache__/
+*.db
+*.log
+.DS_Store

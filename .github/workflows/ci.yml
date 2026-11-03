@@ -1,0 +1,40 @@
+name: Build and test
+on:
+  push:
+  pull_request:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: wordle
+          POSTGRES_PASSWORD: test-only
+          POSTGRES_DB: wordle
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U wordle"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install C dependencies
+        run: sudo apt-get update && sudo apt-get install -y cmake pkg-config libcivetweb-dev libcjson-dev libutf8proc-dev libpq-dev libssl-dev
+      - name: Build and test C engine
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug && cmake --build build -j2 && ctest --test-dir build --output-on-failure
+      - name: Check browser JavaScript
+        run: node --check web/app.js
+      - name: Integration tests
+        env:
+          DATABASE_URL: postgres://wordle:test-only@localhost:5432/wordle
+          APP_ORIGIN: http://localhost:8080
+          TEST_DURATION_MS: "3000"
+          TEST_COUNTDOWN_MS: "100"
+          TEST_GRACE_MS: "1500"
+        run: |
+          python -m pip install requests websocket-client
+          ./build/wordle > /tmp/wordle.log 2>&1 &
+          trap 'kill $! 2>/dev/null || true; cat /tmp/wordle.log' EXIT
+          python tests/integration.py
+      - name: Build production Docker image
+        run: docker build -t cpu-wordle:test .

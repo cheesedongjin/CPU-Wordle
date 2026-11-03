@@ -1,0 +1,24 @@
+{
+  "version": "v1",
+  "korean": {
+    "source": "https://github.com/spellcheck-ko/hunspell-dict-ko",
+    "revision": "606164264399ca037325bd41750f9c108ed4c290",
+    "license": "CC-BY-SA-4.0",
+    "attribution": "hunspell-dict-ko contributors and National Institute of Korean Language",
+    "changes": "Extract normalized headwords from non-legacy result sections; filter to 5–12 game tokens; no definitions/examples."
+  },
+  "english": {
+    "source": "https://github.com/dwyl/english-words",
+    "revision": "20f5cc9b3f0ccc8ce45d814c532b7c2031bba31c",
+    "license": "Unlicense",
+    "changes": "Filter words_alpha.txt to 5–8 lowercase ASCII letters."
+  },
+  "sha256": {
+    "curated_en.txt": "b865d7b2e6b892537fb59d459a4153f8a220a37c5f943e30dd1f4381f63741ec",
+    "curated_ko.txt": "be8b4517eca750c54f79735410a9c33429cd52bea57766bbd14a8124784b694e",
+    "en_allowed.txt": "90605da69a1d1127c6ecdff65eeddd5f5ef7d994ce0953f3d90ad93f1e6dae27",
+    "en_answers.txt": "47dccf1add096beed37a107e9a70cdba76d5e51cbc41e70d32393b78ec5add00",
+    "ko_allowed.txt": "8826a37cdf3f803461c3fefa2f8e72723b2bc98a0eac4771c12ba70ef2b17171",
+    "ko_answers.txt": "6564c093295e16cc3c7b9fc9582bacc880f0296ffef9aefe1583c80c3073b6a3"
+  }
+}
