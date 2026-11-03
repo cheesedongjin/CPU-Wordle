@@ -11,13 +11,18 @@ static pthread_mutex_t db_lock=PTHREAD_MUTEX_INITIALIZER;
 static PGresult *query(const char *sql,int count,const char **values){
     if(PQstatus(db)!=CONNECTION_OK)PQreset(db);
     if(PQstatus(db)!=CONNECTION_OK)return NULL;
+    /* Transaction-local settings work with Neon's transaction pooler too. */
+    PGresult *setup=PQexec(db,"BEGIN; SET LOCAL statement_timeout='5s'");
+    int ready=PQresultStatus(setup)==PGRES_COMMAND_OK;PQclear(setup);
+    if(!ready){PGresult *rollback=PQexec(db,"ROLLBACK");PQclear(rollback);return NULL;}
     PGresult *r=PQexecParams(db,sql,count,NULL,values,NULL,NULL,0);
-    if(PQresultStatus(r)!=PGRES_TUPLES_OK&&PQresultStatus(r)!=PGRES_COMMAND_OK){fprintf(stderr,"Database operation failed (%s)\n",PQresStatus(PQresultStatus(r)));PQclear(r);return NULL;}return r;
+    if(PQresultStatus(r)!=PGRES_TUPLES_OK&&PQresultStatus(r)!=PGRES_COMMAND_OK){fprintf(stderr,"Database operation failed (%s)\n",PQresStatus(PQresultStatus(r)));PQclear(r);PGresult *rollback=PQexec(db,"ROLLBACK");PQclear(rollback);return NULL;}
+    PGresult *commit=PQexec(db,"COMMIT");int ok=PQresultStatus(commit)==PGRES_COMMAND_OK;PQclear(commit);if(!ok){PQclear(r);return NULL;}return r;
 }
 int storage_init(void){
     const char *url=getenv("DATABASE_URL");if(!url||!*url){fprintf(stderr,"DATABASE_URL is required. Use docker compose up --build locally.\n");return 0;}
-    const char *keys[]={"dbname","connect_timeout","options",NULL};
-    const char *vals[]={url,"5","-c statement_timeout=5000",NULL};
+    const char *keys[]={"dbname","connect_timeout",NULL};
+    const char *vals[]={url,"10",NULL};
     db=PQconnectdbParams(keys,vals,1);if(PQstatus(db)!=CONNECTION_OK){fprintf(stderr,"Unable to connect to PostgreSQL (check DATABASE_URL).\n");return 0;}
     const char *schema=
     "CREATE TABLE IF NOT EXISTS users(id text PRIMARY KEY,session_hash text UNIQUE NOT NULL,nickname text NOT NULL,created_at timestamptz NOT NULL DEFAULT now());"
