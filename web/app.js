@@ -68,6 +68,36 @@ function renderBoard(){
     if(rows[r]){const result=rows[r].tiles[c];tile.classList.add(['absent','present','correct'][result]);tile.setAttribute('aria-label',`${value}: ${['없는 글자','다른 위치에 있음','정확한 위치'][result]}`);}else if(value)tile.classList.add('filled');row.append(tile);
   }board.append(row);}
 }
+function renderKeyboard(){
+  const g=state?.game,lang=g?.language||language;
+  const rows=lang==='ko'?['ㅂㅈㄷㄱㅅㅛㅕㅑㅐㅔ','ㅁㄴㅇㄹㅎㅗㅓㅏㅣ','ㅋㅌㅊㅍㅠㅜㅡ']:['qwertyuiop','asdfghjkl','zxcvbnm'];
+  const shifted={'ㅂ':'ㅃ','ㅈ':'ㅉ','ㄷ':'ㄸ','ㄱ':'ㄲ','ㅅ':'ㅆ','ㅐ':'ㅒ','ㅔ':'ㅖ'};
+  const results=new Map();
+  for(const row of g?.rows||[])row.tokens.forEach((token,i)=>{
+    results.set(token,Math.max(results.get(token)??-1,row.tiles[i]));
+  });
+  const keyboard=$('keyboard');
+  const signature=JSON.stringify([lang,[...results]]);
+  if(keyboard.dataset.signature===signature)return;
+  keyboard.dataset.signature=signature;
+  keyboard.setAttribute('aria-label',`${lang==='ko'?'두벌식':'QWERTY'} 글자 사용 현황`);
+  keyboard.replaceChildren();
+  function keyLabel(token,extra=''){
+    const result=results.get(token),status=['absent','present','correct'][result];
+    const label=node('span',token.toUpperCase(),`keyboard-letter${extra}${status?' '+status:''}`);
+    label.setAttribute('aria-label',`${token.toUpperCase()}: ${['없는 글자','다른 위치에 있음','정확한 위치'][result]||'아직 사용하지 않음'}`);
+    return label;
+  }
+  for(const letters of rows){
+    const row=node('div',undefined,'keyboard-row');
+    for(const token of letters){
+      const key=node('div',undefined,'keyboard-key');
+      if(lang==='ko'&&shifted[token])key.append(keyLabel(shifted[token],' keyboard-shift'));
+      key.append(keyLabel(token));row.append(key);
+    }
+    keyboard.append(row);
+  }
+}
 function render(){
   const g=state?.game,queued=state?.queued;$('mode-pill').textContent=['CLASSIC','TIME ATTACK','LIVE DUEL'][g?.mode??mode];$('game-language').textContent=`${(g?.language||language)==='ko'?'한글':'영어'} · ${g?.length||length}칸`;
   $('progress').replaceChildren(document.createTextNode(String(g?.attempts||0)),node('span',' / 6'));
@@ -84,7 +114,7 @@ function render(){
   else if(g?.status==='countdown')message('상대를 찾았어요. 잠시 후 같은 단어로 시작합니다.');
   else if(g?.exhausted)message('시도를 모두 사용했어요. 상대의 결과를 기다려 주세요.');
   else if(g)message(g.mode===1?`${g.round}번째 단어 · 같은 길이로 계속 도전하세요.`:'사전에 있는 단어라면 출제 목록 밖의 단어도 입력할 수 있어요.');
-  renderControls();renderBoard();preview();updateTimer();
+  renderControls();renderBoard();renderKeyboard();preview();updateTimer();
 }
 function preview(){const g=state?.game;const tokens=splitWord($('guess').value,g?.language||language);$('token-preview').textContent=$('guess').value?(tokens?tokens.join(' '):'완성된 단어를 입력하세요'):(language==='ko'?'사과 → ㅅ ㅏ ㄱ ㅗ ㅏ':'apple → a p p l e');$('token-count').textContent=`${tokens?.length||0} / ${g?.length||length}`;renderBoard();}
 function updateTimer(){const g=state?.game;if(!g)return;const dt=performance.now()-receivedAt;const remaining=Math.max(0,Math.min((config?.duration_seconds||180)*1000,g.remaining_ms-dt));const sec=Math.ceil(remaining/1000);$('timer').textContent=`${String(Math.floor(sec/60)).padStart(2,'0')}:${String(sec%60).padStart(2,'0')}`;if(g.status==='countdown'){const n=Math.max(0,Math.ceil((g.countdown_ms-dt)/1000));message(n?`${n}초 뒤 시작합니다. 준비하세요!`:'시작 상태를 확인하고 있습니다…');}}
@@ -130,7 +160,15 @@ $('guess').addEventListener('input',preview);
 $('guess').addEventListener('keydown',e=>{if(e.key==='Enter'&&(e.isComposing||composing||e.keyCode===229))e.preventDefault();});
 $('guess-form').onsubmit=e=>{e.preventDefault();if(composing||busy||!state?.game)return;action('guess',{game_id:state.game.id,puzzle_id:state.game.puzzle_id,word:$('guess').value});};
 $('help-open').onclick=help;$('rules-open').onclick=help;$('credits-open').onclick=credits;$('leaderboard-open').onclick=leaderboard;$('history-open').onclick=history;$('profile-open').onclick=profile;
-$('dialog-close').onclick=()=>$('dialog').close();$('dialog').addEventListener('click',e=>{if(e.target===$('dialog')){const r=$('dialog').getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)$('dialog').close();}});
+const dialog=$('dialog');
+let backdropPointerId=null;
+function isBackdropEvent(e){const r=dialog.getBoundingClientRect();return e.target===dialog&&(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom);}
+$('dialog-close').onclick=()=>dialog.close();
+// Text selection can start inside the dialog and produce a click outside it.
+dialog.addEventListener('pointerdown',e=>{backdropPointerId=e.button===0&&isBackdropEvent(e)?e.pointerId:null;});
+dialog.addEventListener('click',e=>{const dismiss=backdropPointerId!==null&&backdropPointerId===e.pointerId&&isBackdropEvent(e);backdropPointerId=null;if(dismiss)dialog.close();});
+dialog.addEventListener('pointercancel',()=>{backdropPointerId=null;});
+dialog.addEventListener('close',()=>{backdropPointerId=null;});
 setInterval(updateTimer,200);
 setInterval(async()=>{if(!state||busy||ws?.readyState===WebSocket.OPEN)return;try{apply(await api('state'));}catch{}},3000);
 window.addEventListener('online',connectSocket);
