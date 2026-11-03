@@ -27,6 +27,7 @@ typedef struct {
     int user,attempts,total,solved,points,exhausted,saved;
     char user_id[33];
     Guess guesses[6]; char outcome[24];
+    cJSON *history;
 } Player;
 typedef struct {
     int used,mode,lang,length,done,round,answer,pool[MAX_ANSWERS],pool_count,pool_pos;
@@ -61,11 +62,24 @@ static int auth(struct mg_connection *c){
 }
 static int side(Game *g,int uid){return g->p[0].user==uid?0:1;}
 static void next_puzzle(Game *g){g->answer=g->pool[g->pool_pos++];g->round++;random_hex(g->puzzle,16);g->p[0].attempts=0;g->p[0].exhausted=0;memset(g->p[0].guesses,0,sizeof(g->p[0].guesses));}
+static void archive_puzzle(Game *g,Player *p){
+    if(!p->history)p->history=cJSON_CreateArray();
+    cJSON *puzzle=cJSON_GetArrayItem(p->history,g->round-1);
+    if(!puzzle){puzzle=cJSON_CreateObject();addnum(puzzle,"round",g->round);addstr(puzzle,"answer",dictionaries[g->lang].words[g->answer].text);cJSON_AddItemToArray(p->history,puzzle);}
+    cJSON_DeleteItemFromObjectCaseSensitive(puzzle,"rows");
+    cJSON *rows=cJSON_AddArrayToObject(puzzle,"rows");
+    for(int i=0;i<p->attempts;i++){
+        Guess *guess=&p->guesses[i];cJSON *r=cJSON_CreateObject();addstr(r,"word",guess->word.text);
+        cJSON_AddItemToObject(r,"tokens",word_tokens(&guess->word));cJSON *tiles=cJSON_AddArrayToObject(r,"tiles");
+        for(int n=0;n<g->length;n++)cJSON_AddItemToArray(tiles,cJSON_CreateNumber(guess->tiles[n]));
+        cJSON_AddItemToArray(rows,r);
+    }
+}
 static void finish(Game *g,const char *reason,int winner,int64_t now){
     if(g->done)return;g->done=1;g->finished=now;snprintf(g->reason,sizeof(g->reason),"%s",reason);
     int count=g->mode==2?2:1;
     for(int i=0;i<count;i++){
-        Player *p=&g->p[i];const char *outcome="finished";
+        Player *p=&g->p[i];archive_puzzle(g,p);const char *outcome="finished";
         if(!strcmp(reason,"abandoned"))outcome="abandoned";
         else if(g->mode==2){outcome=winner==-2?"invalidated":winner<0?"draw":winner==i?"won":"lost";p->points=winner==-2?0:winner<0?1:winner==i?3:0;}
         else if(g->mode==0)outcome=winner==0?"won":"lost";
@@ -145,6 +159,7 @@ static cJSON *mutate(int uid,const char *action,cJSON *body,int *status){
     if(g->mode==1&&(win||p->attempts==6)){
         cJSON *result=cJSON_CreateObject();addstr(result,"word",w.text);cJSON_AddItemToObject(result,"tokens",word_tokens(&w));cJSON *a=cJSON_AddArrayToObject(result,"tiles");for(int i=0;i<g->length;i++)cJSON_AddItemToArray(a,cJSON_CreateNumber(row->tiles[i]));cJSON_AddBoolToObject(result,"solved",win);
         snprintf(g->last_answer,sizeof(g->last_answer),"%s",dictionaries[g->lang].words[g->answer].text);
+        archive_puzzle(g,p);
         if(g->pool_pos==g->pool_count)finish(g,"pool_exhausted",-1,now);else next_puzzle(g);
         cJSON *j=snapshot(uid);cJSON_AddItemToObject(j,"last_guess",result);return j;
     }
@@ -178,6 +193,7 @@ static int api(struct mg_connection *c,void *unused){
         cJSON *j=NULL;
         if(!strcmp(path,"/api/state"))j=snapshot(uid);
         else if(!strcmp(path,"/api/history"))j=storage_history(u->id);
+        else if(!strcmp(path,"/api/stats"))j=storage_stats(u->id);
         else if(!strcmp(path,"/api/leaderboard")){
             char mode[8]="",lang[8]="",length[8]="",period[8]="";const char *q=r->query_string?r->query_string:"";
             mg_get_var(q,strlen(q),"mode",mode,sizeof(mode));mg_get_var(q,strlen(q),"language",lang,sizeof(lang));mg_get_var(q,strlen(q),"length",length,sizeof(length));mg_get_var(q,strlen(q),"period",period,sizeof(period));
@@ -219,11 +235,12 @@ static void *maintenance(void *arg){
             if(!g->used||!g->done||s>(g->mode==2?1:0)||g->p[s].saved){pthread_mutex_unlock(&state_lock);continue;}
             Game copy=*g;pthread_mutex_unlock(&state_lock);
             Player *p=&copy.p[s];int elapsed=(int)(copy.finished>copy.start?copy.finished-copy.start:0);
-            int ok=storage_result(copy.id,p->user_id,copy.mode,copy.lang,copy.length,p->solved,p->total,elapsed,p->outcome,p->points);
+            char *history=cJSON_PrintUnformatted(p->history);
+            int ok=storage_result(copy.id,p->user_id,copy.mode,copy.lang,copy.length,p->solved,p->total,elapsed,p->outcome,p->points,history);free(history);
             pthread_mutex_lock(&state_lock);if(g->used&&!strcmp(g->id,copy.id)&&ok)g->p[s].saved=1;pthread_mutex_unlock(&state_lock);
         }
         pthread_mutex_lock(&state_lock);int64_t now=now_ms();
-        for(int i=0;i<GAMES;i++){Game *g=&games[i];if(g->used&&g->done&&g->p[0].saved&&(g->mode!=2||g->p[1].saved)&&now-g->finished>600000){for(int u=0;u<USERS;u++)if(users[u].used&&users[u].game==i)users[u].game=-1;memset(g,0,sizeof(*g));}}
+        for(int i=0;i<GAMES;i++){Game *g=&games[i];if(g->used&&g->done&&g->p[0].saved&&(g->mode!=2||g->p[1].saved)&&now-g->finished>600000){for(int u=0;u<USERS;u++)if(users[u].used&&users[u].game==i)users[u].game=-1;cJSON_Delete(g->p[0].history);cJSON_Delete(g->p[1].history);memset(g,0,sizeof(*g));}}
         for(int i=0;i<USERS;i++)if(users[i].used&&users[i].game<0&&!users[i].queued&&now-users[i].seen>3600000){for(int n=0;n<MEMOS;n++)free(users[i].memo[n].response);memset(&users[i],0,sizeof(users[i]));}
         pthread_mutex_unlock(&state_lock);
     }return NULL;

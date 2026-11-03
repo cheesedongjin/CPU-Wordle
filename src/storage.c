@@ -27,6 +27,7 @@ int storage_init(void){
     const char *schema=
     "CREATE TABLE IF NOT EXISTS users(id text PRIMARY KEY,session_hash text UNIQUE NOT NULL,nickname text NOT NULL,created_at timestamptz NOT NULL DEFAULT now());"
     "CREATE TABLE IF NOT EXISTS results(game_id text NOT NULL,user_id text NOT NULL REFERENCES users(id),mode int NOT NULL,lang int NOT NULL,length int NOT NULL,solved int NOT NULL,guesses int NOT NULL,elapsed int NOT NULL,outcome text NOT NULL,points int NOT NULL,version text NOT NULL DEFAULT 'v1',ended_at timestamptz NOT NULL DEFAULT now(),PRIMARY KEY(game_id,user_id));"
+    "ALTER TABLE results ADD COLUMN IF NOT EXISTS history jsonb;"
     "CREATE INDEX IF NOT EXISTS results_board ON results(mode,lang,length,ended_at);"
     "CREATE INDEX IF NOT EXISTS results_user ON results(user_id,ended_at);";
     PGresult *r=PQexec(db,schema);int ok=PQresultStatus(r)==PGRES_COMMAND_OK;PQclear(r);return ok;
@@ -38,10 +39,10 @@ int storage_user(const char *hash,char id[33],char name[81],int create){
     if(r)PQclear(r);pthread_mutex_unlock(&db_lock);return ok;
 }
 int storage_name(const char *id,const char *name){pthread_mutex_lock(&db_lock);const char *v[]={name,id};PGresult *r=query("UPDATE users SET nickname=$1 WHERE id=$2",2,v);int ok=r!=NULL;if(r)PQclear(r);pthread_mutex_unlock(&db_lock);return ok;}
-int storage_result(const char *game,const char *uid,int mode,int lang,int length,int solved,int guesses,int elapsed,const char *outcome,int points){
+int storage_result(const char *game,const char *uid,int mode,int lang,int length,int solved,int guesses,int elapsed,const char *outcome,int points,const char *history){
     char b[7][32];int nums[]={mode,lang,length,solved,guesses,elapsed,points};for(int i=0;i<7;i++)snprintf(b[i],32,"%d",nums[i]);
-    const char *v[]={game,uid,b[0],b[1],b[2],b[3],b[4],b[5],outcome,b[6]};pthread_mutex_lock(&db_lock);
-    PGresult *r=query("INSERT INTO results(game_id,user_id,mode,lang,length,solved,guesses,elapsed,outcome,points) VALUES($1,$2,$3::int,$4::int,$5::int,$6::int,$7::int,$8::int,$9,$10::int) ON CONFLICT(game_id,user_id) DO NOTHING",10,v);
+    const char *v[]={game,uid,b[0],b[1],b[2],b[3],b[4],b[5],outcome,b[6],history};pthread_mutex_lock(&db_lock);
+    PGresult *r=query("INSERT INTO results(game_id,user_id,mode,lang,length,solved,guesses,elapsed,outcome,points,history) VALUES($1,$2,$3::int,$4::int,$5::int,$6::int,$7::int,$8::int,$9,$10::int,$11::jsonb) ON CONFLICT(game_id,user_id) DO NOTHING",11,v);
     int ok=r!=NULL;if(r)PQclear(r);pthread_mutex_unlock(&db_lock);return ok;
 }
 static cJSON *rows(PGresult *r){if(!r)return NULL;cJSON *a=cJSON_CreateArray();for(int i=0;i<PQntuples(r);i++){cJSON *o=cJSON_Parse(PQgetvalue(r,i,0));if(o)cJSON_AddItemToArray(a,o);}PQclear(r);return a;}
@@ -56,4 +57,17 @@ cJSON *storage_board(int mode,int lang,int length,const char *period){
     " SELECT row_to_json(x) FROM (SELECT r.*,u.nickname FROM ranked r JOIN users u ON u.id=r.user_id ORDER BY rank,user_id LIMIT 100) x";
     pthread_mutex_lock(&db_lock);cJSON *a=rows(query(sql,4,v));pthread_mutex_unlock(&db_lock);return a;
 }
-cJSON *storage_history(const char *uid){const char *v[]={uid};pthread_mutex_lock(&db_lock);cJSON *a=rows(query("SELECT row_to_json(x) FROM (SELECT mode,lang,length,solved,guesses,outcome,points,elapsed,ended_at FROM results WHERE user_id=$1 ORDER BY ended_at DESC LIMIT 30) x",1,v));pthread_mutex_unlock(&db_lock);return a;}
+cJSON *storage_history(const char *uid){const char *v[]={uid};pthread_mutex_lock(&db_lock);cJSON *a=rows(query("SELECT row_to_json(x) FROM (SELECT game_id,mode,lang,length,solved,guesses,outcome,points,elapsed,ended_at,history FROM results WHERE user_id=$1 ORDER BY ended_at DESC,game_id DESC LIMIT 30) x",1,v));pthread_mutex_unlock(&db_lock);return a;}
+
+cJSON *storage_stats(const char *uid){
+    const char *v[]={uid};
+    const char *sql=
+    "WITH games AS (SELECT *,sum(CASE WHEN outcome='won' THEN 0 ELSE 1 END) OVER(PARTITION BY mode ORDER BY ended_at DESC,game_id DESC) AS run FROM results WHERE user_id=$1 AND outcome<>'invalidated'),"
+    "streaks AS (SELECT mode,run,count(*) AS wins FROM games WHERE outcome='won' GROUP BY mode,run),"
+    "totals AS (SELECT mode,count(*) AS played,count(*) FILTER(WHERE outcome='won') AS wins,round(avg(guesses),1) AS average_attempts FROM games GROUP BY mode) "
+    "SELECT row_to_json(x) FROM (SELECT m.mode,coalesce(t.played,0) AS played,CASE WHEN m.mode<>1 THEN coalesce(round(100.0*t.wins/nullif(t.played,0),1),0) END AS win_rate,coalesce(t.average_attempts,0) AS average_attempts,"
+    "CASE WHEN m.mode<>1 THEN coalesce((SELECT wins FROM streaks s WHERE s.mode=m.mode AND run=0),0) END AS current_streak,"
+    "CASE WHEN m.mode<>1 THEN coalesce((SELECT max(wins) FROM streaks s WHERE s.mode=m.mode),0) END AS best_streak "
+    "FROM generate_series(0,2) AS m(mode) LEFT JOIN totals t ON t.mode=m.mode ORDER BY m.mode) x";
+    pthread_mutex_lock(&db_lock);cJSON *a=rows(query(sql,1,v));pthread_mutex_unlock(&db_lock);return a;
+}

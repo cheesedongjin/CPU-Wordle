@@ -126,7 +126,7 @@ function help(){const box=openDialog('게임 방법');for(const [title,copy] of 
   ['타임어택','180초 동안 정답 하나당 100점! 정답을 맞히거나 6회를 소진하면 다음 문제로 진행합니다. 같은 세션에서는 정답이 반복되지 않으며 후보를 모두 사용해도 종료됩니다. 동점일 때 유효 추측이 적은 기록이 앞섭니다.'],
   ['실시간 대전','같은 언어·길이의 상대와 자동으로 연결됩니다. 대전 신청은 준비 완료를 뜻하며 매칭 후 3초 뒤 시작합니다. 180초 안에 먼저 맞히면 승리합니다. 서버가 받은 순서로 판정하므로 네트워크 지연의 영향이 있습니다. 둘 다 못 맞히면 무승부입니다.'],
   ['재접속과 기록','연결이 끊겨도 30초 안에 같은 브라우저로 돌아오면 대전을 이어갑니다. 기권은 패배입니다. 서버 재시작 시 진행 중 게임은 복구되지 않으며 순위에도 반영하지 않습니다. 익명 계정은 쿠키를 지우면 복구할 수 없습니다.']]){box.append(node('h3',title),node('p',copy));}}
-function credits(){const box=openDialog('사전 출처 및 서비스 안내');box.append(node('p','한글 입력 사전: 국립국어원 및 hunspell-dict-ko 기여자. 비 legacy 표제어를 추출·정규화하고 게임 길이로 필터링했습니다. 파생 데이터는 CC BY-SA 4.0입니다. 영어 입력 사전: dwyl/english-words, Unlicense. 뜻풀이와 예문은 포함하지 않습니다.'));for(const [label,url] of [['한국어 원본과 라이선스','https://github.com/spellcheck-ko/hunspell-dict-ko'],['영어 원본과 라이선스','https://github.com/dwyl/english-words'],['프로젝트 및 데이터 변환 내역','https://github.com/cheesedongjin/CPU-Wordle']]){const p=node('p'),a=node('a',label);a.href=url;a.target='_blank';a.rel='noopener noreferrer';p.append(a);box.append(p);}box.append(node('h3','무료 서버 안내'),node('p','Render 무료 서버는 이용자가 없으면 절전될 수 있습니다. 첫 접속이 약 1분 지연될 수 있으며 서비스 재시작으로 대전이 종료될 수 있습니다. 완료 기록은 외부 PostgreSQL에 저장됩니다.'),node('h3','저장하는 정보'),node('p','익명 사용자 식별자, 세션 토큰의 해시, 닉네임, 완료된 게임의 점수와 전적을 저장합니다. 세션 토큰은 HttpOnly 쿠키로 보관합니다. 닉네임에 개인정보를 넣지 마세요.'));}
+function credits(){const box=openDialog('사전 출처 및 서비스 안내');box.append(node('p','한글 입력 사전: 국립국어원 및 hunspell-dict-ko 기여자. 비 legacy 표제어를 추출·정규화하고 게임 길이로 필터링했습니다. 파생 데이터는 CC BY-SA 4.0입니다. 영어 입력 사전: dwyl/english-words, Unlicense. 뜻풀이와 예문은 포함하지 않습니다.'));for(const [label,url] of [['한국어 원본과 라이선스','https://github.com/spellcheck-ko/hunspell-dict-ko'],['영어 원본과 라이선스','https://github.com/dwyl/english-words'],['프로젝트 및 데이터 변환 내역','https://github.com/cheesedongjin/CPU-Wordle']]){const p=node('p'),a=node('a',label);a.href=url;a.target='_blank';a.rel='noopener noreferrer';p.append(a);box.append(p);}box.append(node('h3','무료 서버 안내'),node('p','Render 무료 서버는 이용자가 없으면 절전될 수 있습니다. 첫 접속이 약 1분 지연될 수 있으며 서비스 재시작으로 대전이 종료될 수 있습니다. 완료 기록은 외부 PostgreSQL에 저장됩니다.'),node('h3','저장하는 정보'),node('p','익명 사용자 식별자, 세션 토큰의 해시, 닉네임, 완료된 게임의 점수, 전적, 입력한 단어와 시도별 판정 결과를 저장합니다. 세션 토큰은 HttpOnly 쿠키로 보관합니다. 닉네임에 개인정보를 넣지 마세요.'));}
 async function leaderboard(){
   const box=openDialog('리더보드');const filters=node('div',undefined,'filters');const specs=[['mode',[[1,'타임어택'],[2,'실시간 대전']],mode===2?2:1],['language',[['ko','한글'],['en','영어']],language],['length',Array.from({length:8},(_,i)=>[i+5,`${i+5}칸`]),length],['period',[['day','오늘'],['week','이번 주'],['all','전체']], 'all']];const selects={};
   for(const [key,choices,value] of specs){const s=node('select');s.setAttribute('aria-label',key);for(const [v,label] of choices){const o=node('option',label);o.value=v;s.append(o);}s.value=value;selects[key]=s;filters.append(s);}
@@ -134,8 +134,58 @@ async function leaderboard(){
   async function load(){const ticket=++generation;for(const o of selects.length.options)o.disabled=selects.language.value==='en'&&Number(o.value)>8;if(selects.language.value==='en'&&Number(selects.length.value)>8)selects.length.value=5;content.replaceChildren(node('p','기록을 불러오는 중…','empty'));try{const q=new URLSearchParams(Object.fromEntries(Object.entries(selects).map(([k,v])=>[k,v.value])));const rows=await api(`leaderboard?${q}`);if(ticket!==generation)return;content.replaceChildren();if(!rows.length){content.append(node('p','아직 기록이 없어요. 첫 번째 기록을 남겨보세요!','empty'));return;}const table=node('table'),head=node('tr');['순위','플레이어','점수','기록'].forEach(t=>head.append(node('th',t)));const thead=node('thead');thead.append(head);table.append(thead);const tbody=node('tbody');for(const row of rows){const tr=node('tr');if(row.user_id===state?.user_id)tr.className='me';[row.rank,row.nickname,row.points,selects.mode.value==='2'?`${row.wins}승 / ${row.played}경기`:`${row.solved}정답 / ${row.guesses}회`].forEach(t=>tr.append(node('td',String(t))));tbody.append(tr);}table.append(tbody);content.append(table);}catch(e){if(ticket===generation)content.replaceChildren(node('p',e.message,'empty'));}}
   Object.values(selects).forEach(s=>s.addEventListener('change',load));await load();
 }
-async function history(){const box=openDialog('내 플레이 기록');box.append(node('p','최근 완료된 게임 30개를 표시합니다.'));try{const rows=await api('history');if(!$('dialog').open||$('dialog-title').textContent!=='내 플레이 기록')return;if(!rows.length){box.append(node('p','아직 기록이 없어요. 첫 게임을 시작해 보세요.','empty'));return;}const table=node('table');const head=node('tr');['날짜','모드','설정','결과'].forEach(t=>head.append(node('th',t)));table.append(head);for(const r of rows){const tr=node('tr');[new Date(r.ended_at).toLocaleDateString('ko-KR',{timeZone:'Asia/Seoul',month:'numeric',day:'numeric'}),LABELS[r.mode],`${r.lang?'영어':'한글'} ${r.length}칸`,`${STATE_LABELS[r.outcome]||r.outcome} · ${r.points}점`].forEach(t=>tr.append(node('td',t)));table.append(tr);}box.append(table);}catch(e){box.append(node('p',e.message));}}
-function profile(){const box=openDialog('플레이어 이름');const input=node('input');input.className='profile-input';input.maxLength=20;input.value=state?.nickname||'';input.setAttribute('aria-label','닉네임');const button=node('button','이름 저장','primary full');button.onclick=async()=>{const data=await action('name',{nickname:input.value.trim()});if(data){$('dialog').close();toast('이름을 저장했습니다.');}};box.append(node('p','다른 플레이어에게 보일 이름입니다. 개인정보를 넣지 마세요.'),input,button);input.focus();}
+function historyBoard(puzzle,length){
+  const section=node('section',undefined,'history-puzzle');
+  section.append(node('h4',`${puzzle.round}번째 단어 · 정답 ${puzzle.answer}`));
+  const board=node('div',undefined,'history-board');board.setAttribute('aria-label',`${puzzle.round}번째 단어 시도 기록`);
+  for(let r=0;r<6;r++){
+    const row=node('div',undefined,'history-row'),guess=puzzle.rows[r];
+    for(let c=0;c<length;c++){
+      const value=guess?.tokens[c]||'',result=guess?.tiles[c];
+      const tile=node('span',value,`tile${guess?' '+['absent','present','correct'][result]:''}`);
+      tile.setAttribute('aria-label',guess?`${r+1}회 ${value}: ${['없는 글자','다른 위치에 있음','정확한 위치'][result]}`:`${r+1}회 빈 칸`);row.append(tile);
+    }
+    board.append(row);
+  }
+  section.append(board);return section;
+}
+async function loadHistory(box){
+  box.replaceChildren(node('p','기록을 불러오는 중…','empty'));
+  try{
+    const rows=await api('history');if(!box.isConnected)return;box.replaceChildren();
+    if(!rows.length){box.append(node('p','아직 기록이 없어요. 첫 게임을 시작해 보세요.','empty'));return;}
+    for(const r of rows){
+      const card=node('details',undefined,'history-card'),summary=node('summary');
+      const date=new Date(r.ended_at).toLocaleString('ko-KR',{timeZone:'Asia/Seoul',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'});
+      summary.append(node('strong',`${LABELS[r.mode]} · ${r.lang?'영어':'한글'} ${r.length}칸`),node('span',`${STATE_LABELS[r.outcome]||r.outcome} · ${r.guesses}회 · ${r.points}점`),node('small',date));card.append(summary);
+      // Build boards only when opened, especially for long time-attack sessions.
+      card.addEventListener('toggle',()=>{
+        if(!card.open||card.dataset.loaded)return;card.dataset.loaded='true';
+        if(!r.history){card.append(node('p','시도 저장 기능이 추가되기 전의 게임으로, 상세 시도 기록이 없습니다.'));return;}
+        for(const puzzle of r.history)card.append(historyBoard(puzzle,r.length));
+      });box.append(card);
+    }
+  }catch(e){if(box.isConnected)box.replaceChildren(node('p',e.message,'empty'));}
+}
+function history(){const box=openDialog('내 플레이 기록');box.append(node('p','최근 완료된 게임 30개입니다. 게임을 펼치면 시도를 볼 수 있어요.'));const list=node('div');box.append(list);loadHistory(list);}
+function profile(){
+  const box=openDialog('내 정보');const input=node('input');input.className='profile-input';input.maxLength=20;input.value=state?.nickname||'';input.setAttribute('aria-label','닉네임');
+  const button=node('button','이름 저장','secondary');button.onclick=async()=>{const data=await action('name',{nickname:input.value.trim()});if(data)toast('이름을 저장했습니다.');};
+  const name=node('div',undefined,'profile-name');name.append(input,button);box.append(name,node('h3','모드별 누적 통계'));
+  const stats=node('div',undefined,'profile-stats');stats.append(node('p','통계를 불러오는 중…'));box.append(stats);
+  box.append(node('p','전체 기간 · 모든 언어와 길이 합산. 중도 종료와 무승부는 승리로 계산하지 않으며 연승이 끊깁니다. 무효 경기는 제외합니다. 평균 시도는 종료된 게임당 기준이며 타임어택은 세션당 기준입니다. 타임어택에는 승패와 연승이 없습니다.','stats-note'));
+  api('stats').then(rows=>{
+    if(!stats.isConnected)return;stats.replaceChildren();
+    for(const r of rows){
+      const card=node('section',undefined,'stats-card');card.append(node('h4',LABELS[r.mode]));const metrics=node('dl',undefined,'stats-grid');
+      for(const [label,value] of [['누적 플레이',`${r.played}회`],['승률',r.win_rate===null?'해당 없음':`${r.win_rate}%`],['평균 시도 횟수',`${Number(r.average_attempts).toFixed(1)}회`],['현재 연승',r.current_streak===null?'해당 없음':`${r.current_streak}회`],['최다 연승',r.best_streak===null?'해당 없음':`${r.best_streak}회`]]){
+        const metric=node('div');metric.append(node('dt',label),node('dd',value));metrics.append(metric);
+      }card.append(metrics);stats.append(card);
+    }
+  }).catch(e=>{if(stats.isConnected)stats.replaceChildren(node('p',e.message,'empty'));});
+  box.append(node('h3','최근 게임의 시도'),node('p','최근 완료된 게임 30개입니다. 게임을 펼쳐 색상 타일로 시도를 확인하세요.'));
+  const list=node('div');box.append(list);loadHistory(list);
+}
 function connectSocket(){
   if(ws&&(ws.readyState===WebSocket.OPEN||ws.readyState===WebSocket.CONNECTING))return;
   ws=new WebSocket(`${location.protocol==='https:'?'wss:':'ws:'}//${location.host}/ws`);

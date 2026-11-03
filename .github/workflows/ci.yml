@@ -23,7 +23,9 @@ jobs:
       - name: Build and test C engine
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug && cmake --build build -j2 && ctest --test-dir build --output-on-failure
       - name: Check browser JavaScript
-        run: node --check web/app.js
+        run: |
+          node --check web/app.js
+          node tests/test_history_ui.cjs
       - name: Integration tests
         env:
           DATABASE_URL: postgres://wordle:test-only@localhost:5432/wordle
