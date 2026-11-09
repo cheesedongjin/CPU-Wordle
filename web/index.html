@@ -3,68 +3,87 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="theme-color" content="#2f3350">
-  <meta name="description" content="한글 자모와 영어로 즐기는 워들. 타임어택, 실시간 대전, 리더보드.">
+  <meta name="theme-color" id="theme-color" content="#2a2e49">
+  <meta name="description" content="한글 자모와 영어로 즐기는 워들. 문제 코드를 공유해 같은 문제를 풀어보세요.">
   <title>CPU WORDLE — 오늘의 단어 감각</title>
-  <link rel="icon" href="/icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="/styles.css">
-  <script src="/app.js" defer></script>
+  <link rel="icon" href="./icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./styles.css">
+  <script src="./words.js" defer></script>
+  <script src="./engine.js" defer></script>
+  <script src="./app.js" defer></script>
 </head>
-<body>
+<body data-mode="classic">
   <header class="topbar">
-    <a class="brand" href="/" aria-label="CPU Wordle 홈"><span class="brand-icon">W<span></span></span><span>CPU<span class="brand-light">WORDLE</span></span></a>
-    <nav aria-label="주 메뉴"><button id="leaderboard-open" class="nav-button"><span aria-hidden="true">↗</span> 리더보드</button><button id="history-open" class="nav-button">내 기록</button><button id="help-open" class="help-button" aria-label="게임 방법">?</button></nav>
+    <a class="brand" href="./" aria-label="CPU Wordle 홈"><span class="brand-icon">W</span><span>CPU<span class="brand-light">WORDLE</span></span></a>
+    <button id="help-open" class="icon-button" aria-label="게임 방법">?</button>
   </header>
   <main>
-    <section class="intro">
-      <div><p class="eyebrow"><span class="live-dot"></span> A LITTLE WORDPLAY, EVERY DAY</p><h1>한 칸씩, 정답에 가까이.</h1><p class="intro-copy">익숙한 단어를 새로운 시선으로. 당신의 단어 감각을 깨워보세요.</p></div>
-      <button id="profile-open" class="profile" aria-label="내 정보"><span class="avatar">나</span><span><small>오늘의 플레이어</small><strong id="nickname">연결 중…</strong></span><span class="edit-mark">↗</span></button>
+    <section class="hero">
+      <p class="eyebrow"><span class="live-dot"></span><span id="hero-eyebrow">CLASSIC · 6 TRIES</span></p>
+      <h1 id="hero-title">한 칸씩, 정답에 가까이.</h1>
+      <p class="hero-copy" id="hero-copy">익숙한 단어를 새로운 시선으로. 당신의 단어 감각을 깨워보세요.</p>
     </section>
+
+    <nav class="mode-tabs" aria-label="게임 모드">
+      <button class="mode-tab" data-mode="classic" aria-pressed="true">
+        <span class="mode-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="8" height="8" rx="2"/><rect x="13" y="3" width="8" height="8" rx="2"/><rect x="3" y="13" width="8" height="8" rx="2"/><rect x="13" y="13" width="8" height="8" rx="2"/></svg></span>
+        <span class="mode-text"><strong>기본</strong><small>6번의 기회 · 단어 하나</small></span>
+      </button>
+      <button class="mode-tab" data-mode="hacker" aria-pressed="false">
+        <span class="mode-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="2.5" y="4" width="19" height="16" rx="2.5"/><path d="M7 10l3 2.5L7 15M12.5 15H17"/></svg></span>
+        <span class="mode-text"><strong>해커</strong><small>7번의 기회 · 오답은 한 칸 손상</small></span>
+      </button>
+      <button class="mode-tab" data-mode="detective" aria-pressed="false">
+        <span class="mode-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="10" cy="10" r="6.5"/><path d="M15 15l6 6"/></svg></span>
+        <span class="mode-text"><strong>탐정</strong><small>7번의 기회 · 두 이름 추리</small></span>
+      </button>
+    </nav>
+
     <div class="layout">
       <aside class="settings panel">
-        <p class="eyebrow">YOUR PLAYGROUND</p><h2>어떻게 즐길까요?</h2>
         <fieldset id="settings-fields">
           <legend class="sr-only">게임 설정</legend>
-          <label class="field-label">언어 <span>LANGUAGE</span></label>
-          <div class="segmented" role="group" aria-label="언어"><button class="selected" data-language="ko" aria-pressed="true">한글 <small>가나다</small></button><button data-language="en" aria-pressed="false">영어 <small>ABC</small></button></div>
-          <label class="field-label" for="length">단어 길이 <span id="length-label">자모 기준</span></label>
-          <select id="length"><option value="5">5칸</option></select>
-          <p class="field-note" id="pool-note">출제 단어를 불러오는 중입니다.</p>
-          <p class="field-label">플레이 모드 <span>MODE</span></p>
-          <div class="mode-list" role="group" aria-label="플레이 모드">
-            <button class="mode selected" data-mode="0" aria-pressed="true"><span class="mode-icon">▦</span><span><strong>클래식</strong><small>6번의 기회, 나만의 속도로</small></span><span class="radio"></span></button>
-            <button class="mode" data-mode="1" aria-pressed="false"><span class="mode-icon">◷</span><span><strong>타임어택</strong><small>180초, 몇 단어까지 가능할까?</small></span><span class="radio"></span></button>
-            <button class="mode" data-mode="2" aria-pressed="false"><span class="mode-icon">⇄</span><span><strong>실시간 대전</strong><small>같은 단어, 먼저 맞히는 사람이 승리</small></span><span class="radio"></span></button>
+          <div class="field">
+            <span class="field-label">언어 <span>LANGUAGE</span></span>
+            <div class="segmented" role="group" aria-label="언어"><button class="selected" data-language="ko" aria-pressed="true">한글 <small>가나다</small></button><button data-language="en" aria-pressed="false">영어 <small>ABC</small></button></div>
           </div>
+          <div class="field">
+            <label class="field-label" for="length">단어 길이 <span id="length-label">자모 기준</span></label>
+            <select id="length"><option value="5">5칸</option></select>
+          </div>
+          <p class="field-note" id="pool-note">출제 단어를 불러오는 중입니다.</p>
         </fieldset>
-        <button id="start" class="primary full" disabled>게임 시작 <span>→</span></button>
-        <button id="abandon" class="text-button full" hidden>게임 그만하기</button>
-        <div class="connection"><span id="connection-dot" class="dot"></span><span id="connection-text">서버에 연결하고 있습니다</span></div>
+        <button id="start" class="primary full">다른 문제 <span aria-hidden="true">↻</span></button>
+        <div class="share-section">
+          <label class="field-label" for="puzzle-code">현재 문제 코드</label>
+          <div class="code-row"><input id="puzzle-code" class="code-input" readonly spellcheck="false"><button id="copy-code" class="secondary" aria-label="문제 코드 복사">복사</button></div>
+          <p class="field-note">친구에게 코드를 보내면 같은 문제를 풀어요.</p>
+        </div>
+        <form id="code-form" class="share-section">
+          <label class="field-label" for="shared-code">친구의 문제 코드</label>
+          <div class="code-row"><input id="shared-code" class="code-input" placeholder="CW1-KO-…" maxlength="32" required autocomplete="off" spellcheck="false"><button type="submit" class="secondary">열기</button></div>
+        </form>
       </aside>
-      <section class="game panel" aria-label="게임 보드">
-        <div class="game-top"><div><span class="pill" id="mode-pill">CLASSIC</span><span class="game-language" id="game-language">한글 · 5칸</span></div><span id="progress" class="progress">0 <span>/ 6</span></span></div>
-        <div id="session-stats" class="session-stats" hidden><div><small>남은 시간</small><strong id="timer">03:00</strong></div><div><small>맞힌 단어</small><strong id="solved">0</strong></div><div><small>점수</small><strong id="score">0</strong></div></div>
-        <div id="opponent" class="opponent" hidden></div>
-        <div class="board-wrap"><div id="board" class="board" aria-label="단어 추측 결과"></div><div id="waiting" class="waiting" hidden><div class="orbit">⇄</div><h3>함께 풀 상대를 찾고 있어요</h3><p>같은 언어와 길이를 선택한 플레이어를 기다립니다.</p><button id="cancel-queue" class="secondary">대기 취소</button></div></div>
+
+      <section id="game-theme" class="game panel" aria-label="게임 보드">
+        <div class="game-top"><div class="game-meta"><span class="pill" id="mode-pill">CLASSIC</span><span class="game-language" id="game-language">한글 · 5칸</span></div><span id="progress" class="progress">0 / 6</span></div>
+        <p id="mode-description" class="mode-description"></p>
+        <details id="name-candidates" hidden><summary>용의자 명단 100명 보기</summary><p id="name-list"></p></details>
+        <div class="board-wrap"><div id="board" class="board-group" aria-label="단어 추측 결과"></div></div>
         <div id="game-message" class="game-message" role="status">게임을 시작하고 첫 단어를 입력해 보세요.</div>
         <div id="result" class="result" hidden></div>
         <form id="guess-form" autocomplete="off">
           <label for="guess" class="sr-only">추측할 단어</label>
-          <div class="guess-input"><input id="guess" name="word" maxlength="64" placeholder="완성된 단어를 입력하세요" spellcheck="false" autocapitalize="off" disabled><button id="submit" type="submit" disabled aria-label="단어 제출">입력 <span>↵</span></button></div>
+          <div class="guess-input"><input id="guess" name="word" maxlength="64" placeholder="완성된 단어를 입력하세요" spellcheck="false" autocapitalize="off" disabled><button id="submit" type="submit" disabled aria-label="단어 제출">입력 <span aria-hidden="true">↵</span></button></div>
           <div class="input-hint"><span id="token-preview">사과 → ㅅ ㅏ ㄱ ㅗ ㅏ</span><span id="token-count">0 / 5</span></div>
         </form>
-        <section class="keyboard-status" aria-labelledby="keyboard-title"><div class="keyboard-heading"><h2 id="keyboard-title">사용한 글자</h2><span>제출한 단어 기준</span></div><div id="keyboard" class="keyboard"></div></section>
-        <div class="legend"><span><i class="correct"></i>글자·위치 일치</span><span><i class="present"></i>글자만 일치</span><span><i class="absent"></i>없는 글자</span></div>
+        <section class="keyboard-status" aria-labelledby="keyboard-title"><div class="keyboard-heading"><h2 id="keyboard-title">사용한 글자</h2><label class="sr-only" for="keyboard-target">글자 현황을 볼 인물</label><select id="keyboard-target" hidden><option value="0">용의자 A 기준</option><option value="1">용의자 B 기준</option></select></div><div id="keyboard" class="keyboard"></div></section>
+        <div class="legend"><span id="hidden-legend" hidden><i class="corrupted"></i>손상 · 미공개</span><span><i class="correct"></i>글자·위치 일치</span><span><i class="present"></i>글자만 일치</span><span><i class="absent"></i>없는 글자</span><span><i class="unused"></i>미입력</span></div>
       </section>
-      <aside class="right-column">
-        <section class="tip panel"><div class="tip-top"><span>✳</span><span class="eyebrow">A SMALL HINT</span></div><h2>한글은<br>자모로 생각해요.</h2><p id="tip-copy">‘사과’는 2글자지만<br>이곳에서는 5칸이에요.</p><div class="example-tiles" aria-label="ㅅ ㅏ ㄱ ㅗ ㅏ"><span>ㅅ</span><span>ㅏ</span><span>ㄱ</span><span>ㅗ</span><span>ㅏ</span></div><p class="tip-foot">ㅘ는 ㅗ + ㅏ로 나눠요.<br>ㅐ와 ㄲ는 한 칸 그대로!</p></section>
-        <section class="mini-guide panel"><h3>좋은 첫 단어의 조건</h3><p>서로 다른 자모가 들어간 단어로 시작해 보세요. 노란 칸의 글자는 다른 위치에서도 찾아보세요.</p><button id="rules-open" class="text-button">게임 규칙 자세히 <span>↗</span></button></section>
-        <p class="side-note">작은 추측이 모여<br>하나의 정답이 됩니다.</p>
-      </aside>
     </div>
-    <footer><span>CPU WORDLE <span class="footer-dot">·</span> 단어를 발견하는 즐거움</span><button id="credits-open" class="text-button">사전 출처 및 서비스 안내</button></footer>
+    <footer><span>CPU WORDLE <span class="footer-dot">·</span> 단어를 발견하는 즐거움</span><a href="../data/README.md">사전 출처 및 라이선스</a></footer>
   </main>
-  <dialog id="dialog"><div class="dialog-heading"><h2 id="dialog-title"></h2><button id="dialog-close" class="help-button" aria-label="닫기">×</button></div><div id="dialog-content"></div></dialog>
+  <dialog id="dialog"><div class="dialog-heading"><h2 id="dialog-title">게임 방법</h2><button id="dialog-close" class="icon-button" aria-label="닫기">×</button></div><div id="dialog-content"><p>6번 안에 정답을 찾아보세요. 모든 모드에서 초록은 글자와 위치 일치, 노랑은 다른 위치에 포함된 글자, 짙은 회색은 남아 있는 같은 글자가 없음을 뜻합니다. 아직 입력하지 않은 글자와 판정 전의 칸은 회색입니다.</p><p>해커: 7번의 기회이며 오답을 입력하면 무작위 한 칸의 글자와 판정이 ?로 가려집니다. 정답을 입력하면 물음표 없이 모든 칸이 초록으로 공개됩니다. 탐정: 한글 자모·영어 알파벳 5칸 고정이며 언어별 후보 100개 중 두 이름을 공통 7번의 기회 안에 찾아보세요. 이름 하나를 제출하면 두 보드에 동시에 단서가 표시됩니다. 찾은 이름은 계속 확인 상태로 남습니다.</p><p>한글은 자모로 나눕니다. 사과 → ㅅ ㅏ ㄱ ㅗ ㅏ (5칸). ㅘ와 겹받침은 나누고, ㅐ와 쌍자음은 한 칸입니다.</p><p>문제 코드 복사를 누른 뒤 친구에게 보내 주세요. 친구가 ‘친구의 문제 코드’에 붙여 넣으면 같은 모드·언어·길이·정답으로 시작합니다.</p><p>모드·언어·길이를 바꾸거나 다른 코드를 열면 바로 새 문제가 시작되고 현재 진행은 초기화됩니다. 새로고침해도 진행 내용은 사라집니다.</p><p>한글 사전: 국립국어원 및 hunspell-dict-ko 기여자 · CC BY-SA 4.0. 영어 사전: dwyl/english-words · Unlicense.</p></div></dialog>
   <div id="toast" class="toast" role="status" hidden></div>
 </body>
 </html>

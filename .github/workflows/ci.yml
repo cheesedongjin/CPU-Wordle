@@ -1,42 +1,53 @@
-name: Build and test
+name: Test and deploy GitHub Pages
 on:
   push:
   pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_USER: wordle
-          POSTGRES_PASSWORD: test-only
-          POSTGRES_DB: wordle
-        ports: ["5432:5432"]
-        options: >-
-          --health-cmd "pg_isready -U wordle"
-          --health-interval 5s --health-timeout 5s --health-retries 10
     steps:
       - uses: actions/checkout@v4
-      - name: Install C dependencies
-        run: sudo apt-get update && sudo apt-get install -y cmake pkg-config libcivetweb-dev libcjson-dev libutf8proc-dev libpq-dev libssl-dev
-      - name: Build and test C engine
-        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug && cmake --build build -j2 && ctest --test-dir build --output-on-failure
-      - name: Check browser JavaScript
-        run: |
-          node --check web/app.js
-          node tests/test_history_ui.cjs
-      - name: Integration tests
-        env:
-          DATABASE_URL: postgres://wordle:test-only@localhost:5432/wordle
-          APP_ORIGIN: http://localhost:8080
-          TEST_DURATION_MS: "3000"
-          TEST_COUNTDOWN_MS: "100"
-          TEST_GRACE_MS: "1500"
-        run: |
-          python -m pip install requests websocket-client
-          ./build/wordle > /tmp/wordle.log 2>&1 &
-          trap 'kill $! 2>/dev/null || true; cat /tmp/wordle.log' EXIT
-          python tests/integration.py
-      - name: Build production Docker image
-        run: docker build -t cpu-wordle:test .
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - run: python scripts/bundle_data.py
+      - run: git diff --exit-code -- web/words.js
+      - run: node --check web/app.js
+      - run: node --test tests/test_local.cjs
+      - run: python scripts/build_pages.py
+
+  deploy:
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    concurrency:
+      group: github-pages
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - run: python scripts/build_pages.py
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: build/pages
+      - name: Deploy GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
