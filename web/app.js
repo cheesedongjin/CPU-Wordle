@@ -12,6 +12,7 @@ const HERO = {
   hacker: {eyebrow: 'HACKER · 7 TRIES · SIGNAL UNSTABLE', title: '깨진 신호 속 정답을 해독하라.', copy: '오답을 낼 때마다 한 칸이 손상됩니다. 남은 단서로 시스템을 뚫어보세요.', color: '#06110d'},
   detective: {eyebrow: 'DETECTIVE · 2 SUSPECTS · 100 NAMES', title: '두 개의 이름, 하나의 단서.', copy: '용의자 100명 중 두 사람을 7번 안에 찾아내세요. 한 번의 추리가 두 사건 모두에 흔적을 남깁니다.', color: '#1b1613'}
 };
+const MAX_LENGTH = 7;
 function availablePuzzles() { return mode === 'detective' ? namePuzzles(language) : [...puzzles.values()].filter(p => p.language === language); }
 function updateSettings() {
   document.querySelectorAll('[data-mode]').forEach(button => {
@@ -22,7 +23,7 @@ function updateSettings() {
     const selected = button.dataset.language === language;
     button.classList.toggle('selected', selected); button.setAttribute('aria-pressed', selected);
   });
-  const choices = [...new Set(availablePuzzles().map(p => p.length))].sort((a,b) => a-b);
+  const choices = [...new Set(availablePuzzles().map(p => p.length))].filter(n => n <= MAX_LENGTH).sort((a,b) => a-b);
   if (!choices.includes(length)) length = choices[0];
   $('length').replaceChildren(...choices.map(n => { const option = node('option', `${n}칸`); option.value = n; return option; }));
   $('length').value = length;
@@ -64,7 +65,7 @@ function render() {
   $('result').hidden = !g || active;
   if (g && !active) $('result').replaceChildren(node('h3', g.won ? '정답입니다!' : '기회를 모두 사용했어요.'), node('p', `정답은 ${(g.answers || [g.answer]).map(a => `‘${a}’`).join(', ')}`));
   message(active ? (g.mode === 'detective' ? `두 사람의 이름을 찾아보세요. (${g.solved.filter(Boolean).length}/2명 확인)` : '단어를 입력해 정답을 찾아보세요.') : '새 문제를 만들거나 친구의 문제 코드를 입력하세요.');
-  renderBoard(); renderKeyboard(); preview();
+  renderBoard(); renderKeyboard(); preview(); fitBoard();
 }
 function renderBoard(){
   const g=state?.game,n=g?.length||length,rows=g?.rows||[];
@@ -79,8 +80,8 @@ function renderBoard(){
       for(let c=0;c<n;c++){
         const value=rows[r]?.tokens[c]??(r===rows.length?preview[c]:'')??'';
         const result=rows[r]?.results[target][c];
-        const tile=node('span',result===-1?'?':value,'tile');
-        if(rows[r]){tile.classList.add(result===-1?'corrupted':['absent','present','correct'][result]);tile.setAttribute('aria-label',result===-1?'오류: 판정 미공개':`${value}: ${['없는 글자','다른 위치에 있음','정확한 위치'][result]}`);}
+        const tile=node('span',value,'tile');
+        if(rows[r]){tile.classList.add(result===-1?'corrupted':['absent','present','correct'][result]);tile.setAttribute('aria-label',result===-1?`${value}: 판정 미공개`:`${value}: ${['없는 글자','다른 위치에 있음','정확한 위치'][result]}`);}
         else if(value)tile.classList.add('filled');row.append(tile);
       }
       section.append(row);
@@ -88,27 +89,60 @@ function renderBoard(){
     board.append(section);
   }
 }
+// Shrink tiles until the board, input and keyboard all fit in the window together.
+function fitBoard(){
+  const board=$('board'),game=$('game-theme');
+  if(typeof innerHeight!=='number'||!board.getBoundingClientRect)return;
+  const docTop=el=>el.getBoundingClientRect().top+scrollY,docBottom=el=>el.getBoundingClientRect().bottom+scrollY;
+  const wrap=document.querySelector('.board-wrap'),keys=document.querySelector('.keyboard-status');
+  const rows=MODES[state?.game?.mode||mode].attempts,topbar=document.querySelector('.topbar').offsetHeight;
+  board.style.setProperty('--tile','60px');
+  const first=board.querySelector('.tile');if(!first)return;
+  let tile=Math.min(60,Math.floor(first.getBoundingClientRect().width));
+  const gameTop=docTop(game);
+  let avail=innerHeight-12-gameTop;
+  if(avail<420)avail=innerHeight-topbar-20;
+  const need=()=>Math.max(docBottom(wrap),docBottom(keys))-gameTop;
+  for(let i=0;i<5;i++){
+    board.style.setProperty('--tile',tile+'px');
+    const over=need()-avail;
+    if(over<=0||tile<=26)break;
+    tile=Math.max(26,tile-Math.ceil(over/rows));
+  }
+  board.style.setProperty('--tile',tile+'px');
+}
+const STATUS=['absent','present','correct'],STATUS_TEXT=['없는 글자','다른 위치에 있음','정확한 위치'];
 function renderKeyboard(){
-  const g=state?.game,lang=g?.language||language;
+  const g=state?.game,lang=g?.language||language,split=g?.mode==='detective';
   const rows=lang==='ko'?['ㅂㅈㄷㄱㅅㅛㅕㅑㅐㅔ','ㅁㄴㅇㄹㅎㅗㅓㅏㅣ','ㅋㅌㅊㅍㅠㅜㅡ']:['qwertyuiop','asdfghjkl','zxcvbnm'];
   const shifted={'ㅂ':'ㅃ','ㅈ':'ㅉ','ㄷ':'ㄸ','ㄱ':'ㄲ','ㅅ':'ㅆ','ㅐ':'ㅒ','ㅔ':'ㅖ'};
-  $('keyboard-target').hidden = g?.mode !== 'detective';
-  const target = g?.mode === 'detective' ? Number($('keyboard-target').value || 0) : 0;
-  const results=new Map();
-  for(const row of g?.rows||[])row.tokens.forEach((token,i)=>{
-    const result=row.results[target][i];
-    if(result >= 0) results.set(token,Math.max(results.get(token)??-1,result));
+  $('keyboard-split-note').hidden=!split;
+  // One map per suspect (detective) or a single map; masked (-1) results never count.
+  const results=(split?[0,1]:[0]).map(target=>{
+    const map=new Map();
+    for(const row of g?.rows||[])row.tokens.forEach((token,i)=>{
+      const result=row.results[target][i];
+      if(result>=0)map.set(token,Math.max(map.get(token)??-1,result));
+    });
+    return map;
   });
   const keyboard=$('keyboard');
-  const signature=JSON.stringify([lang,[...results]]);
+  const signature=JSON.stringify([lang,...results.map(map=>[...map])]);
   if(keyboard.dataset.signature===signature)return;
   keyboard.dataset.signature=signature;
   keyboard.setAttribute('aria-label',`${lang==='ko'?'두벌식':'QWERTY'} 글자 사용 현황`);
   keyboard.replaceChildren();
   function keyLabel(token,extra=''){
-    const result=results.get(token),status=['absent','present','correct'][result];
-    const label=node('span',token.toUpperCase(),`keyboard-letter${extra}${status?' '+status:''}`);
-    label.setAttribute('aria-label',`${token.toUpperCase()}: ${['없는 글자','다른 위치에 있음','정확한 위치'][result]||'아직 사용하지 않음'}`);
+    const values=results.map(map=>map.get(token));
+    const label=node('span',token.toUpperCase(),`keyboard-letter${extra}`);
+    if(split){
+      const [a,b]=values.map(v=>STATUS[v]||'unused');
+      label.classList.add('split',`a-${a}`,`b-${b}`);
+      label.setAttribute('aria-label',`${token.toUpperCase()}: 용의자 A ${STATUS_TEXT[values[0]]||'아직 사용하지 않음'}, 용의자 B ${STATUS_TEXT[values[1]]||'아직 사용하지 않음'}`);
+    }else{
+      if(STATUS[values[0]])label.classList.add(STATUS[values[0]]);
+      label.setAttribute('aria-label',`${token.toUpperCase()}: ${STATUS_TEXT[values[0]]||'아직 사용하지 않음'}`);
+    }
     return label;
   }
   for(const letters of rows){
@@ -129,7 +163,6 @@ function changeSettings(update) {
   if (JSON.stringify([mode, language, length]) !== before) randomPuzzle();
 }
 document.querySelectorAll('[data-mode]').forEach(button => button.addEventListener('click', () => changeSettings(() => {mode = button.dataset.mode;})));
-$('keyboard-target').addEventListener('change', renderKeyboard);
 $('start').addEventListener('click', randomPuzzle);
 document.querySelectorAll('[data-language]').forEach(button => button.addEventListener('click', () => changeSettings(() => {language = button.dataset.language;})));
 $('length').addEventListener('change', () => changeSettings(() => {length = Number($('length').value);}));
@@ -161,6 +194,12 @@ $('guess-form').addEventListener('submit', event => {
   $('guess').value = ''; render();
   if (g.status === 'active') $('guess').focus();
 });
+if(typeof addEventListener==='function')addEventListener('resize',fitBoard);
+// Close the floating suspect list on Escape or a click elsewhere.
+if(typeof addEventListener==='function'){
+  addEventListener('click',event=>{if(!$('name-candidates').contains(event.target))$('name-candidates').open=false;});
+  addEventListener('keydown',event=>{if(event.key==='Escape')$('name-candidates').open=false;});
+}
 $('help-open').addEventListener('click', () => $('dialog').showModal());
 $('dialog-close').addEventListener('click', () => $('dialog').close());
 updateSettings(); randomPuzzle();

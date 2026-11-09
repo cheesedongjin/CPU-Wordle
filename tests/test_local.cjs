@@ -127,7 +127,7 @@ test('Theme UI shares both boards and excludes masked evidence from keyboard', (
   page.run("$('guess').value=state.game.answers[1]");page.elements.get('guess-form').fire('submit');
   assert.equal(page.run('state.game.won'),true);
   page.run("start(themedPuzzle('hacker',puzzles.get(puzzleCode('en','apple'))));submitGuess(state.game,'grape',()=>0);render()");
-  assert.equal(page.elements.get('board').children[0].children[0].children[0].textContent,'?');
+  assert.equal(page.elements.get('board').children[0].children[0].children[0].textContent,'g');
   assert.ok(!JSON.parse(page.elements.get('keyboard').dataset.signature)[1].some(([token])=>token==='g'));
 });
 
@@ -159,4 +159,23 @@ test('Changing a setting starts a new puzzle immediately and themes the page', (
   page.run("changeSettings(()=>{mode='detective'})");
   assert.equal(page.run('state.game.answers.length'),2);
   assert.equal(page.run('document.body.dataset.mode'),'detective');
+});
+
+test('Length choices stop at seven cells in both languages', () => {
+  const page=browser();
+  for(const lang of ['ko','en']){
+    page.run(`mode='classic';language='${lang}';length=12;updateSettings()`);
+    const values=page.elements.get('length').children.map(option=>Number(option.value));
+    assert.deepEqual(values,[5,6,7]);
+    assert.equal(page.run('length'),5);
+  }
+});
+test('Detective keyboard reports both suspects at once', () => {
+  const page=browser();
+  page.run("start(themedPuzzle('detective',namePuzzles('en').find(p=>p.answer==='alice'),namePuzzles('en').find(p=>p.answer==='james')))");
+  page.run("$('guess').value='james'");page.elements.get('guess-form').fire('submit');
+  const [,a,b]=JSON.parse(page.elements.get('keyboard').dataset.signature);
+  assert.deepEqual(Object.fromEntries(a).j,0);
+  assert.deepEqual(Object.fromEntries(b).j,2);
+  assert.equal(page.elements.get('keyboard-split-note').hidden,false);
 });
