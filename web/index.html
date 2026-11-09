@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" id="theme-color" content="#2a2e49">
   <meta name="description" content="한글 자모와 영어로 즐기는 워들. 문제 코드를 공유해 같은 문제를 풀어보세요.">
-  <title>CPU WORDLE — 오늘의 단어 감각</title>
+  <title>CPU WORDLE(가제) — 오늘의 단어 감각</title>
   <link rel="icon" href="./icon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="./styles.css">
   <script src="./words.js" defer></script>
@@ -14,7 +14,7 @@
 </head>
 <body data-mode="classic">
   <header class="topbar">
-    <a class="brand" href="./" aria-label="CPU Wordle 홈"><span class="brand-icon">W</span><span>CPU<span class="brand-light">WORDLE</span></span></a>
+    <a class="brand" href="./" aria-label="CPU WORDLE(가제) 홈"><span class="brand-icon">W</span><span>CPU<span class="brand-light">WORDLE</span></span></a>
     <button id="help-open" class="icon-button" aria-label="게임 방법">?</button>
   </header>
   <main>
@@ -80,7 +80,7 @@
         </div>
       </div>
     </section>
-    <footer><span>CPU WORDLE <span class="footer-dot">·</span> 단어를 발견하는 즐거움</span><a href="../data/README.md">사전 출처 및 라이선스</a></footer>
+    <footer><span>CPU WORDLE(가제) <span class="footer-dot">·</span> 단어를 발견하는 즐거움</span><a href="../data/README.md">사전 출처 및 라이선스</a></footer>
   </main>
   <dialog id="dialog"><div class="dialog-heading"><h2 id="dialog-title">게임 방법</h2><button id="dialog-close" class="icon-button" aria-label="닫기">×</button></div><div id="dialog-content"><p>6번 안에 정답을 찾아보세요. 모든 모드에서 초록은 글자와 위치 일치, 노랑은 다른 위치에 포함된 글자, 짙은 회색은 남아 있는 같은 글자가 없음을 뜻합니다. 아직 입력하지 않은 글자와 판정 전의 칸은 회색입니다.</p><p>해커: 7번의 기회이며 오답을 입력하면 무작위 한 칸의 판정이 가려져 줄무늬 칸으로 표시되고, 입력한 글자만 보입니다. 정답을 입력하면 가려짐 없이 모든 칸이 초록으로 공개됩니다. 탐정: 한글 자모·영어 알파벳 5칸 고정이며 언어별 후보 100개 중 두 이름을 공통 7번의 기회 안에 찾아보세요. 이름 하나를 제출하면 두 보드에 동시에 단서가 표시됩니다. 찾은 이름은 계속 확인 상태로 남습니다.</p><p>한글은 자모로 나눕니다. 사과 → ㅅ ㅏ ㄱ ㅗ ㅏ (5칸). ㅘ와 겹받침은 나누고, ㅐ와 쌍자음은 한 칸입니다.</p><p>문제 코드 복사를 누른 뒤 친구에게 보내 주세요. 친구가 ‘친구의 문제 코드’에 붙여 넣으면 같은 모드·언어·길이·정답으로 시작합니다.</p><p>모드·언어·길이를 바꾸거나 다른 코드를 열면 바로 새 문제가 시작되고 현재 진행은 초기화됩니다. 새로고침해도 진행 내용은 사라집니다.</p><p>한글 사전: 국립국어원 및 hunspell-dict-ko 기여자 · CC BY-SA 4.0. 영어 사전: dwyl/english-words · Unlicense.</p></div></dialog>
   <div id="toast" class="toast" role="status" hidden></div>
