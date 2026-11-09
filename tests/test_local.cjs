@@ -29,6 +29,7 @@ test('Every code is unique, stable across dictionary ordering and resolves the s
   assert.equal(puzzleCode('en','apple'),'CW1-EN-10BC2ABF');
   for(const lang of ['ko','en']) for(let n=5;n<=(lang==='ko'?12:8);n++) assert.ok([...first.values()].some(p=>p.language===lang&&p.length===n));
 });
+// app.js를 실제 브라우저 없이 돌리기 위한 최소한의 가짜 DOM
 function browser() {
   class Element {
     constructor(){this.value='';this.dataset={};this.children=[];this.listeners={};this.classList={toggle(){},add(){}};}
@@ -37,8 +38,8 @@ function browser() {
     fire(name){return this.listeners[name]?.({preventDefault(){}});}
   }
   const elements = new Map([...fs.readFileSync('web/index.html','utf8').matchAll(/id="([^"]+)"/g)].map(match => [match[1],new Element()]));
-  const context = vm.createContext({document:{body:new Element(),getElementById(id){if(!elements.has(id))throw new Error(`Missing element: ${id}`);return elements.get(id);},createElement(){return new Element();},querySelectorAll(){return [];}},navigator:{clipboard:{writeText:async text=>{context.copied=text;}}},setTimeout(){},clearTimeout(){}});
-  for(const file of ['words','engine','app']) vm.runInContext(fs.readFileSync(`web/${file}.js`,'utf8'),context);
+  const context = vm.createContext({document:{body:new Element(),getElementById(id){if(!elements.has(id))throw new Error(`Missing element: ${id}`);return elements.get(id);},createElement(){return new Element();},querySelectorAll(){return [];}},navigator:{clipboard:{writeText:async text=>{context.copied=text;}}},setTimeout(){},clearTimeout(){},atob});
+  for(const file of ['words','wordle_wasm','engine','app']) vm.runInContext(fs.readFileSync(`web/${file}.js`,'utf8'),context);
   return {elements,context,run:code=>vm.runInContext(code,context)};
 }
 test('Separate browsers open the same code; invalid inputs preserve attempts; win stops submissions', async () => {

@@ -18,8 +18,11 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.x'
+      - run: pip install ziglang==0.17.1
+      - run: python scripts/test_c.py
+      - run: python scripts/build_wasm.py
       - run: python scripts/bundle_data.py
-      - run: git diff --exit-code -- web/words.js
+      - run: git diff --exit-code -- web/wordle_wasm.js web/words.js
       - run: node --check web/app.js
       - run: node --test tests/test_local.cjs
       - run: python scripts/build_pages.py

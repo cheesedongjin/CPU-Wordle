@@ -1,5 +1,5 @@
-"""Rebuild data from pinned public dictionary sources already cloned in .cache.
-Only headwords are extracted; definitions/examples are not redistributed.
+""".cache에 받아 둔 고정 버전의 공개 사전에서 data/ 파일을 다시 만듭니다.
+표제어만 추출하며 뜻풀이·예문은 재배포하지 않습니다.
 """
 from pathlib import Path
 import re, json, hashlib, shutil, unicodedata
@@ -10,6 +10,7 @@ EN_REV = '20f5cc9b3f0ccc8ce45d814c532b7c2031bba31c'
 INITIAL = list('ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ')
 VOWELS = ['ㅏ','ㅐ','ㅑ','ㅒ','ㅓ','ㅔ','ㅕ','ㅖ','ㅗ','ㅗㅏ','ㅗㅐ','ㅗㅣ','ㅛ','ㅜ','ㅜㅓ','ㅜㅔ','ㅜㅣ','ㅠ','ㅡ','ㅡㅣ','ㅣ']
 FINAL = ['','ㄱ','ㄲ','ㄱㅅ','ㄴ','ㄴㅈ','ㄴㅎ','ㄷ','ㄹ','ㄹㄱ','ㄹㅁ','ㄹㅂ','ㄹㅅ','ㄹㅌ','ㄹㅍ','ㄹㅎ','ㅁ','ㅂ','ㅂㅅ','ㅅ','ㅆ','ㅇ','ㅈ','ㅊ','ㅋ','ㅌ','ㅍ','ㅎ']
+# src/wordle.c의 wd_split과 같은 규칙으로 자모 칸 수를 셉니다.
 def tokens(word):
     out = ''
     for ch in unicodedata.normalize('NFC', word):
@@ -22,7 +23,7 @@ def main():
     out = ROOT/'data'; out.mkdir(exist_ok=True)
     ko = set()
     for p in (ROOT/'.cache/hunspell-ko/data/entries').glob('*.yaml'):
-        if '-legacy' in p.name: continue
+        if '-legacy' in p.name: continue  # 예전 형식 데이터는 제외
         for entry in p.read_text(encoding='utf-8').split('\n---\n'):
             result = entry.partition('\nresult:\n')[2]
             if not result or '제외:' in result: continue
@@ -34,6 +35,7 @@ def main():
         selected = (ROOT/f'data/curated_{lang}.txt').read_text(encoding='utf-8').split()
         seen = set(); answers=[]; rejected=[]
         for w in selected:
+            # 사전에 없는 단어는 버리고, 자모가 같은 단어는 하나만 출제
             key = tokens(w) if lang=='ko' else w
             if w not in words: rejected.append(w); continue
             if key in seen: continue
