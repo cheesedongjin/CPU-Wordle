@@ -8,9 +8,9 @@ function toast(text){$('toast').textContent=text;$('toast').hidden=false;clearTi
 function message(text,error=false){$('game-message').textContent=text;$('game-message').classList.toggle('error',error);}
 
 const HERO = {
-  classic: {eyebrow: 'CLASSIC · 6 TRIES', title: '한 칸씩, 정답에 가까이.', copy: '익숙한 단어를 새로운 시선으로. 당신의 단어 감각을 깨워보세요.', color: '#2a2e49'},
-  hacker: {eyebrow: 'HACKER · 7 TRIES · SIGNAL UNSTABLE', title: '깨진 신호 속 정답을 해독하라.', copy: '오답을 낼 때마다 한 칸이 손상됩니다. 남은 단서로 시스템을 뚫어보세요.', color: '#06110d'},
-  detective: {eyebrow: 'DETECTIVE · 2 SUSPECTS · 100 NAMES', title: '두 개의 이름, 하나의 단서.', copy: '용의자 100명 중 두 사람을 7번 안에 찾아내세요. 한 번의 추리가 두 사건 모두에 흔적을 남깁니다.', color: '#1b1613'}
+  classic: {eyebrow: 'CLASSIC · 6번의 기회', title: '단어 하나를 6번 안에 맞히세요', copy: '초록은 글자와 위치 일치, 노랑은 글자만 일치, 회색은 없는 글자입니다.', color: '#2a2e49'},
+  hacker: {eyebrow: 'HACKER · 7번의 기회', title: '오답마다 한 칸의 판정이 가려집니다', copy: '가려진 칸은 줄무늬로 표시되고 입력한 글자만 보입니다. 정답을 맞히면 모두 공개됩니다.', color: '#06110d'},
+  detective: {eyebrow: 'DETECTIVE · 7번의 기회', title: '이름 후보 100개 중 두 개를 찾으세요', copy: '한 번 입력하면 두 보드에 동시에 판정됩니다.', color: '#1b1613'}
 };
 const MAX_LENGTH = 7;
 function availablePuzzles() { return mode === 'detective' ? namePuzzles(language) : [...puzzles.values()].filter(p => p.language === language); }
@@ -74,7 +74,7 @@ function renderBoard(){
   const board=$('board');board.className=g?.mode==='detective'?'detective-boards':'board-group';board.replaceChildren();
   for(let target=0;target<(g?.answers?.length||1);target++){
     const section=node('section',undefined,'board');section.setAttribute('style',`--cols:${n}`);
-    if(g?.mode==='detective'){const solved=g.solved[target];const title=node('h3',undefined,`board-title${solved?' solved':''}`);title.append(node('span',`용의자 ${'AB'[target]}`),node('strong',solved?g.answers[target]:'미확인'));section.append(title);}
+    if(g?.mode==='detective'){const solved=g.solved[target];const title=node('h3',undefined,`board-title${solved?' solved':''}`);title.append(node('span',`인물 ${'AB'[target]}`),node('strong',solved?g.answers[target]:'미확인'));section.append(title);}
     for(let r=0;r<MODES[g?.mode||mode].attempts;r++){
       const row=node('div',undefined,'board-row');if(r===rows.length&&g?.status==='active')row.classList.add('current');
       for(let c=0;c<n;c++){
@@ -138,7 +138,7 @@ function renderKeyboard(){
     if(split){
       const [a,b]=values.map(v=>STATUS[v]||'unused');
       label.classList.add('split',`a-${a}`,`b-${b}`);
-      label.setAttribute('aria-label',`${token.toUpperCase()}: 용의자 A ${STATUS_TEXT[values[0]]||'아직 사용하지 않음'}, 용의자 B ${STATUS_TEXT[values[1]]||'아직 사용하지 않음'}`);
+      label.setAttribute('aria-label',`${token.toUpperCase()}: 인물 A ${STATUS_TEXT[values[0]]||'아직 사용하지 않음'}, 인물 B ${STATUS_TEXT[values[1]]||'아직 사용하지 않음'}`);
     }else{
       if(STATUS[values[0]])label.classList.add(STATUS[values[0]]);
       label.setAttribute('aria-label',`${token.toUpperCase()}: ${STATUS_TEXT[values[0]]||'아직 사용하지 않음'}`);

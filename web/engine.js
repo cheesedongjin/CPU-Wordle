@@ -39,7 +39,7 @@ function createPuzzles(data) {
 const MODES = {
   classic: {label: '기본', badge: 'CLASSIC', attempts: 6, description: '6번의 기회로 단어 하나를 찾아보세요.'},
   hacker: {label: '해커', badge: 'HACKER', attempts: 7, description: '7번의 기회 · 오답은 무작위 한 칸이 가려지고, 정답은 모두 공개됩니다.'},
-  detective: {label: '탐정', badge: 'DETECTIVE', attempts: 7, description: '5칸 고정 · 후보 100개 · 공통 7번의 기회로 두 이름을 찾으세요.'}
+  detective: {label: '탐정', badge: 'DETECTIVE', attempts: 7, description: '5칸 고정 · 이름 후보 100개 · 7번 안에 두 이름 찾기'}
 };
 // Fictional first-name candidates; independent of the general word dictionary.
 const NAMES = {
