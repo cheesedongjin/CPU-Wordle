@@ -2,8 +2,9 @@ const {test} = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
-const {splitWord, judge, puzzleCode, createPuzzles} = require('../web/engine.js');
-const data = vm.runInNewContext(fs.readFileSync('web/words.js','utf8') + '; WORDLE_DATA');
+const {splitWord, judge, puzzleCode, decodeAnswers, createPuzzles} = require('../web/engine.js');
+const raw = vm.runInNewContext(fs.readFileSync('web/words.js','utf8') + '; WORDLE_DATA');
+const data = Object.fromEntries(['ko','en'].map(lang => [lang,{...decodeAnswers(raw)[lang],allowed:raw[lang].allowed}]));
 test('Korean decomposition and normalization', () => {
   assert.deepEqual(splitWord('사과','ko'), [...'ㅅㅏㄱㅗㅏ']);
   assert.deepEqual(splitWord('사과','ko'), splitWord('사과','ko'));
@@ -26,7 +27,7 @@ test('Every code is unique, stable across dictionary ordering and resolves the s
     assert.ok(data[puzzle.language].allowed.includes(puzzle.answer));
     assert.equal(puzzleCode(puzzle.language,puzzle.answer),code);
   }
-  assert.equal(puzzleCode('en','apple'),'CW1-EN-10BC2ABF');
+  assert.equal(puzzleCode('en','apple'),'CW2-EN-F123CC0B');
   for(const lang of ['ko','en']) for(let n=5;n<=(lang==='ko'?12:8);n++) assert.ok([...first.values()].some(p=>p.language===lang&&p.length===n));
 });
 // app.js를 실제 브라우저 없이 돌리기 위한 최소한의 가짜 DOM
@@ -38,9 +39,11 @@ function browser() {
     fire(name){return this.listeners[name]?.({preventDefault(){}});}
   }
   const elements = new Map([...fs.readFileSync('web/index.html','utf8').matchAll(/id="([^"]+)"/g)].map(match => [match[1],new Element()]));
-  const context = vm.createContext({document:{body:new Element(),getElementById(id){if(!elements.has(id))throw new Error(`Missing element: ${id}`);return elements.get(id);},createElement(){return new Element();},querySelectorAll(){return [];}},navigator:{clipboard:{writeText:async text=>{context.copied=text;}}},setTimeout(){},clearTimeout(){},atob});
+  const context = vm.createContext({document:{body:new Element(),getElementById(id){if(!elements.has(id))throw new Error(`Missing element: ${id}`);return elements.get(id);},createElement(){return new Element();},querySelectorAll(){return [];}},navigator:{clipboard:{writeText:async text=>{context.copied=text;}}},setTimeout(){},clearTimeout(){},atob,TextDecoder});
+  let inside; // app.js는 함수 안에 있으므로 훅으로 받은 eval로 내부 변수를 읽고 씁니다.
+  context.WORDLE_TEST_HOOK=evaluate=>{inside=evaluate;};
   for(const file of ['words','wordle_wasm','engine','app']) vm.runInContext(fs.readFileSync(`web/${file}.js`,'utf8'),context);
-  return {elements,context,run:code=>vm.runInContext(code,context)};
+  return {elements,context,run:code=>inside(code)};
 }
 test('Separate browsers open the same code; invalid inputs preserve attempts; win stops submissions', async () => {
   const a=browser(),b=browser();
@@ -69,6 +72,13 @@ test('Six valid misses finish the game; IME composition does not submit', () => 
   page.elements.get('guess').fire('compositionend');
   for(let n=0;n<6;n++){page.elements.get('guess').value='grape';page.elements.get('guess-form').fire('submit');}
   assert.equal(page.run('state.game.status'),'finished');assert.equal(page.run('state.game.won'),false);
+});
+test('Answers and game state are not readable as plain globals', () => {
+  const page=browser();
+  for(const lang of ['ko','en']) assert.equal(typeof raw[lang].answers,'string');
+  assert.ok(!raw.en.answers.includes('apple') && !raw.ko.answers.includes('사과'));
+  for(const name of ['puzzles','state','allowed']) assert.equal(vm.runInContext(`typeof ${name}`,page.context),'undefined');
+  assert.equal(page.run('typeof state.game.answer'),'string');
 });
 test('Clipboard failure selects the code for manual copy', async () => {
   const page=browser();page.context.navigator.clipboard=undefined;
@@ -116,7 +126,7 @@ test('Theme codes round trip and detective pools always have pairs', () => {
       assert.deepEqual(resolvePuzzle(puzzle.code,puzzles),puzzle);
     }
   }
-  assert.equal(resolvePuzzle('CWD1-EN-00000000-00000000',puzzles),undefined);
+  assert.equal(resolvePuzzle('CWD2-EN-00000000-00000000',puzzles),undefined);
 });
 test('Theme UI shares both boards and excludes masked evidence from keyboard', () => {
   const page=browser();

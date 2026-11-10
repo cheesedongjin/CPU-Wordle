@@ -1,6 +1,6 @@
 # Word data
 
-`ko_answers.txt`와 `en_answers.txt`만 출제합니다. `*_allowed.txt`는 입력 검증용이며 출제 후보로 자동 편입하지 않습니다.
+`ko_answers.txt`와 `en_answers.txt`만 출제합니다. 이 두 파일과 `curated_*.txt`는 GitHub Pages 배포본에서 빠지며, 게임에는 `web/words.js`에 가려진 형태로 들어갑니다. `*_allowed.txt`는 입력 검증용이며 출제 후보로 자동 편입하지 않습니다.
 
 - 한국어: 국립국어원 및 hunspell-dict-ko 기여자의 비 legacy 사전 데이터에서 `result` 표제어만 추출했습니다. 제외된 항목은 생략하며 게임의 5~12칸 범위로 필터링했습니다. 뜻풀이·예문은 포함하지 않습니다. 이 파생 한국어 데이터는 **CC BY-SA 4.0**으로 제공합니다.
 - 영어: dwyl/english-words의 `words_alpha.txt`를 5~8글자 소문자 단어로 필터링했습니다. **Unlicense**입니다. 입력 사전에는 희귀어도 있지만 출제 목록은 별도로 선정했습니다.

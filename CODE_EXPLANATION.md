@@ -68,28 +68,32 @@ for (int i = 0; i < n; i++) {
 
 ## 3. 문제 코드
 
-위치: [src/wordle.c:84](src/wordle.c:84) `wd_hash`, [src/wordle.c:110](src/wordle.c:110) `wd_make_code`, [src/wordle.c:144](src/wordle.c:144) `wd_parse_code`
+위치: [src/wordle.c:88](src/wordle.c:88) `wd_hash`, [src/wordle.c:117](src/wordle.c:117) `wd_make_code`, [src/wordle.c:151](src/wordle.c:151) `wd_parse_code`
 
 ```c
-uint32_t hash = 2166136261u;
+uint32_t hash = 2166136261u ^ WD_SALT;
 for (int i = 0; i < len; i++) hash = (hash ^ word[i]) * 16777619u;
+hash ^= hash >> 16; hash *= 0x85EBCA6Bu;
+hash ^= hash >> 13; hash *= 0xC2B2AE35u;
+return hash ^ hash >> 16;
 ```
 
-- 단어의 각 글자 코드로 FNV-1a 해시(32비트)를 만들어 단어 ID로 씁니다. 사전 순서나 선택한 길이가 바뀌어도 같은 단어는 같은 코드입니다.
+- 단어의 각 글자 코드로 32비트 해시를 만들어 단어 ID로 씁니다. 사전 순서나 선택한 길이가 바뀌어도 같은 단어는 같은 코드입니다.
+- 시작값에 `WD_SALT`를 섞고 끝에서 비트를 한 번 더 섞습니다. 공개 사전을 일반 FNV-1a로 해시해 코드와 맞춰 보는 방법을 막기 위한 가벼운 장치이며, 암호는 아닙니다. 솔트를 바꾸면 기존 코드가 모두 무효가 되므로 접두사 버전도 함께 올립니다.
 - `wd_make_code`는 ID를 대문자 16진수 8자리로 붙여 코드 문자열을 만듭니다.
 
 | 모드 | 형식 | 예 |
 |---|---|---|
-| 기본 | `CW1-언어-단어ID` | `CW1-EN-10BC2ABF` (apple) |
-| 해커 | `CWH1-언어-단어ID` | |
-| 탐정 | `CWD1-언어-이름ID-이름ID` | |
+| 기본 | `CW2-언어-단어ID` | `CW2-EN-F123CC0B` (apple) |
+| 해커 | `CWH2-언어-단어ID` | |
+| 탐정 | `CWD2-언어-이름ID-이름ID` | |
 
-- `wd_parse_code`는 형식이 정확히 맞을 때만 모드·언어·ID를 돌려줍니다. 접두사를 `CWH1` → `CWD1` → `CW1` 순서로 확인합니다. 소문자 16진수, 남는 글자, 모자란 자릿수는 모두 실패입니다.
-- 해석한 ID로 실제 단어를 찾는 일은 데이터가 있는 JS([web/engine.js:95](web/engine.js:95) `resolvePuzzle`)가 합니다. 탐정 코드는 두 이름이 후보에 있고 서로 다를 때만 열립니다.
+- `wd_parse_code`는 형식이 정확히 맞을 때만 모드·언어·ID를 돌려줍니다. 접두사를 `CWH2` → `CWD2` → `CW2` 순서로 확인합니다. 예전 `CW1` 코드는 열리지 않습니다. 소문자 16진수, 남는 글자, 모자란 자릿수는 모두 실패입니다.
+- 해석한 ID로 실제 단어를 찾는 일은 데이터가 있는 JS([web/engine.js:112](web/engine.js:112) `resolvePuzzle`)가 합니다. 탐정 코드는 두 이름이 후보에 있고 서로 다를 때만 열립니다.
 
 ## 4. 추측 한 번 처리와 모드별 규칙
 
-위치: [src/wordle.c:176](src/wordle.c:176) `wd_play`, 기회 수는 [src/wordle.c:91](src/wordle.c:91) `wd_attempts`
+위치: [src/wordle.c:183](src/wordle.c:183) `wd_play`, 기회 수는 [src/wordle.c:97](src/wordle.c:97) `wd_attempts`
 
 ```c
 for (int i = 0; i < count; i++) {
@@ -110,11 +114,11 @@ if (rows_done + 1 >= wd_attempts(mode)) status |= WD_FINISHED;
 - **탐정**: 정답 두 개, 공통 7번. 한 번 입력하면 두 정답 모두 판정합니다. 맞힌 정답은 `solved_mask` 비트로 계속 남고, 둘 다 맞히면 승리입니다.
 - 반환값 하나에 "맞힌 정답 비트 | 끝남 | 승리"를 담습니다(비트 값은 [src/wordle.h](src/wordle.h)).
 - 난수는 JS가 `Math.random()` 값을 넘겨줍니다. 테스트에서는 고정된 값을 넘겨 가릴 칸을 정할 수 있습니다.
-- 게임 기록(줄 목록 등)은 화면이 쓰는 JS 객체에 남고, C는 계산만 합니다. 연결부는 [web/engine.js:108](web/engine.js:108) `submitGuess`입니다.
+- 게임 기록(줄 목록 등)은 화면이 쓰는 JS 객체에 남고, C는 계산만 합니다. 연결부는 [web/engine.js:125](web/engine.js:125) `submitGuess`입니다.
 
 ## 5. 사용한 글자 집계
 
-위치: [src/wordle.c:196](src/wordle.c:196) `wd_keyboard`, 화면 쪽은 [web/app.js:126](web/app.js:126) `renderKeyboard`
+위치: [src/wordle.c:203](src/wordle.c:203) `wd_keyboard`, 화면 쪽은 [web/app.js:128](web/app.js:128) `renderKeyboard`
 
 ```c
 if (results[i] < 0) continue;
@@ -129,7 +133,7 @@ else if (results[i] > best[k]) best[k] = results[i];
 
 ## 6. C와 JS 사이 값 주고받기
 
-C 쪽: [src/wordle.c:215](src/wordle.c:215) `#ifdef __wasm__` 아래, JS 쪽: [web/engine.js:15](web/engine.js:15) `put`, `take`
+C 쪽: [src/wordle.c:222](src/wordle.c:222) `#ifdef __wasm__` 아래, JS 쪽: [web/engine.js:15](web/engine.js:15) `put`, `take`
 
 ```c
 static uint32_t in_buf[WD_BUF];
@@ -154,12 +158,12 @@ const take = count => [...new Int32Array(wasm.memory.buffer, wasm.wd_out(), coun
 
 ## 7. 입력 검증과 설정 변경 (화면 쪽)
 
-위치: [web/app.js:192](web/app.js:192) 입력 폼, [web/app.js:166](web/app.js:166) `changeSettings`
+위치: [web/app.js:194](web/app.js:194) 입력 폼, [web/app.js:168](web/app.js:168) `changeSettings`
 
 - 한글 입력기가 글자를 조합하는 중에는 Enter를 눌러도 제출하지 않습니다.
 - 칸 수가 맞고 사전(탐정은 이름 후보)에 있는 단어만 `submitGuess`로 넘깁니다. 잘못된 입력은 기회를 쓰지 않습니다.
 - 모드·언어·길이를 바꾸면 값이 실제로 바뀌었을 때만 새 문제를 시작합니다. 길이 선택지는 7칸까지입니다.
-- [web/app.js:103](web/app.js:103) `fitBoard`는 보드·입력칸·키보드가 한 화면에 들어올 때까지 칸 크기를 줄입니다.
+- [web/app.js:105](web/app.js:105) `fitBoard`는 보드·입력칸·키보드가 한 화면에 들어올 때까지 칸 크기를 줄입니다.
 
 ## 8. 빌드와 테스트
 
@@ -168,7 +172,7 @@ const take = count => [...new Int32Array(wasm.memory.buffer, wasm.wd_out(), coun
 | [scripts/build_wasm.py](scripts/build_wasm.py) | `src/wordle.c`를 WebAssembly로 컴파일해 `web/wordle_wasm.js`를 만듭니다. C를 고친 뒤 꼭 실행하세요. |
 | [scripts/test_c.py](scripts/test_c.py) | [tests/test_engine.c](tests/test_engine.c)를 네이티브로 컴파일해 C 규칙을 직접 검사합니다. |
 | [tests/test_local.cjs](tests/test_local.cjs) | Node에서 wasm을 불러 JS 연결부와 화면 흐름을 검사합니다. |
-| [scripts/bundle_data.py](scripts/bundle_data.py) | `data/`의 단어 목록을 `web/words.js`로 묶습니다. |
+| [scripts/bundle_data.py](scripts/bundle_data.py) | `data/`의 단어 목록을 `web/words.js`로 묶습니다. 출제 목록은 XOR + base64로 가리고, [web/engine.js:51](web/engine.js:51) `decodeAnswers`가 풉니다. |
 | [scripts/build_data.py](scripts/build_data.py) | `.cache`의 원본 사전에서 `data/` 목록을 다시 만듭니다. |
 | [scripts/build_pages.py](scripts/build_pages.py) | GitHub Pages용 파일을 `build/pages`에 모으고 링크를 검사합니다. |
 | [.github/workflows/ci.yml](.github/workflows/ci.yml) | C 테스트 → wasm·사전 번들이 커밋된 파일과 같은지 확인 → JS 테스트 → Pages 빌드·배포 |

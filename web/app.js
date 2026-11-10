@@ -1,7 +1,9 @@
 'use strict';
 // 화면 그리기와 이벤트 처리. 규칙은 C 엔진(src/wordle.c)에 있고 engine.js가 연결합니다.
+// 전체를 함수 안에 두어 puzzles·state 같은 변수가 콘솔에서 전역으로 보이지 않게 합니다.
+(() => {
 const $ = id => document.getElementById(id);
-const puzzles = createPuzzles(WORDLE_DATA);
+const puzzles = createPuzzles(decodeAnswers(WORDLE_DATA));
 const allowed = Object.fromEntries(['ko', 'en'].map(lang => [lang, new Set(WORDLE_DATA[lang].allowed)]));
 // 현재 설정과 진행 중인 게임
 let mode = 'classic', language = 'ko', length = 5, state = null, composing = false, lastBoard = '', toastTimer;
@@ -176,7 +178,7 @@ $('code-form').addEventListener('submit', event => {
   event.preventDefault();
   const code = $('shared-code').value.trim().toUpperCase();
   const puzzle = resolvePuzzle(code, puzzles);
-  if (!puzzle) { toast('문제 코드를 확인해 주세요. 예: CW1-KO-12345678'); return; }
+  if (!puzzle) { toast('문제 코드를 확인해 주세요. 예: CW2-KO-12345678'); return; }
   if (state?.game.code === code) { toast('지금 풀고 있는 문제입니다.'); return; }
   start(puzzle); $('shared-code').value = '';
 });
@@ -211,3 +213,6 @@ if(typeof addEventListener==='function'){
 $('help-open').addEventListener('click', () => $('dialog').showModal());
 $('dialog-close').addEventListener('click', () => $('dialog').close());
 updateSettings(); randomPuzzle();
+// Node 테스트(tests/test_local.cjs)만 이 훅을 미리 정의해 내부 상태를 확인합니다.
+if (typeof WORDLE_TEST_HOOK === 'function') WORDLE_TEST_HOOK(code => eval(code));
+})();

@@ -50,7 +50,9 @@ static void test_codes(void) {
     int mode, lang;
     uint32_t apple = wd_hash(TEXT(U"apple"), 5);
     int len = wd_make_code(WD_CLASSIC, WD_EN, apple, 0, text);
-    CHECK(len == 15 && memcmp(text, "CW1-EN-10BC2ABF", 15) == 0);
+    CHECK(len == 15 && memcmp(text, "CW2-EN-F123CC0B", 15) == 0);
+    /* 솔트 없는 FNV-1a(apple = 10BC2ABF)와 달라야 함 */
+    CHECK(apple != 0x10BC2ABFu);
 
     /* 만든 코드를 다시 읽으면 같은 값이 나와야 함 */
     for (int m = 0; m < 3; m++) {
@@ -60,7 +62,8 @@ static void test_codes(void) {
         CHECK(mode == m && lang == WD_KO && id1 == 0xDEADBEEF);
         CHECK(id2 == (m == WD_DETECTIVE ? 0x0123ABCDu : 0u));
     }
-    const char *bad[] = {"BAD", "CW1-EN-10BC2AB", "CW1-EN-10bc2abf", "CW1-JP-10BC2ABF", "CW1-EN-10BC2ABF-", "CWD1-EN-10BC2ABF"};
+    /* 예전 버전(CW1) 코드도 거부 */
+    const char *bad[] = {"BAD", "CW2-EN-F123CC0", "CW2-EN-f123cc0b", "CW2-JP-F123CC0B", "CW2-EN-F123CC0B-", "CWD2-EN-F123CC0B", "CW1-EN-10BC2ABF"};
     for (unsigned k = 0; k < sizeof bad / sizeof *bad; k++) {
         len = (int)strlen(bad[k]);
         for (int i = 0; i < len; i++) code[i] = (unsigned char)bad[k][i];

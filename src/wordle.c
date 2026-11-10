@@ -80,11 +80,17 @@ void wd_judge(const uint32_t *answer, const uint32_t *guess, int n, int32_t *out
     }
 }
 
-/* 단어 ID = FNV-1a 해시(32비트). 사전 순서나 설정과 관계없이 같은 단어는 같은 ID입니다. */
+/* 단어 ID(32비트). 사전 순서나 설정과 관계없이 같은 단어는 같은 ID입니다.
+   공개 사전을 일반 FNV-1a로 해시해 코드와 맞춰 보는 방법을 막으려고, 시작값에 SALT를 섞고
+   끝에 비트를 한 번 더 섞습니다. 가볍게 가리는 장치일 뿐 암호는 아닙니다.
+   SALT를 바꾸면 이미 공유된 코드가 모두 무효가 되므로, 바꿀 때는 코드 버전(PREFIX)도 올리세요. */
+#define WD_SALT 0x6C3A91F5u
 uint32_t wd_hash(const uint32_t *word, int len) {
-    uint32_t hash = 2166136261u;
+    uint32_t hash = 2166136261u ^ WD_SALT;
     for (int i = 0; i < len; i++) hash = (hash ^ word[i]) * 16777619u;
-    return hash;
+    hash ^= hash >> 16; hash *= 0x85EBCA6Bu;
+    hash ^= hash >> 13; hash *= 0xC2B2AE35u;
+    return hash ^ hash >> 16;
 }
 
 /* 모드별 기회 수 */
@@ -92,7 +98,8 @@ int wd_attempts(int mode) {
     return mode == WD_CLASSIC ? 6 : 7;
 }
 
-static const char *const PREFIX[3] = {"CW1", "CWH1", "CWD1"};
+/* 2: 단어 ID에 SALT를 섞은 버전. 예전 CW1 코드는 읽지 않습니다. */
+static const char *const PREFIX[3] = {"CW2", "CWH2", "CWD2"};
 static const char *const LANG_CODE[2] = {"KO", "EN"};
 static const char HEX[] = "0123456789ABCDEF";
 
@@ -106,7 +113,7 @@ static int append_hex(char *out, int at, uint32_t value) {
     return at;
 }
 
-/* 문제 코드 만들기: 기본 CW1-KO-XXXXXXXX, 해커 CWH1-…, 탐정 CWD1-언어-ID1-ID2 */
+/* 문제 코드 만들기: 기본 CW2-KO-XXXXXXXX, 해커 CWH2-…, 탐정 CWD2-언어-ID1-ID2 */
 int wd_make_code(int mode, int lang, uint32_t id1, uint32_t id2, char *out) {
     int at = append(out, 0, PREFIX[mode]);
     out[at++] = '-';
@@ -142,7 +149,7 @@ static int read_hex(const uint32_t *code, int len, int at, uint32_t *value) {
 
 /* 문제 코드 해석. 형식이 정확히 맞을 때만 1을 돌려줍니다(대문자 기준). */
 int wd_parse_code(const uint32_t *code, int len, int *mode, int *lang, uint32_t *id1, uint32_t *id2) {
-    /* 긴 접두사부터 확인해야 CWH1이 CW1로 잘못 읽히지 않습니다. */
+    /* 긴 접두사부터 확인해야 CWH2가 CW2로 잘못 읽히지 않습니다. */
     static const int ORDER[3] = {WD_HACKER, WD_DETECTIVE, WD_CLASSIC};
     for (int k = 0; k < 3; k++) {
         int m = ORDER[k], at = expect(code, len, 0, PREFIX[m]);

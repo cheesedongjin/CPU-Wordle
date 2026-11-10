@@ -1,6 +1,6 @@
 """GitHub Pages에 올릴 정적 파일을 build/pages에 모읍니다(사전 출처 고지 포함)."""
 from pathlib import Path
-from shutil import copy2, copytree
+from shutil import copy2, copytree, ignore_patterns
 from html.parser import HTMLParser
 from urllib.parse import urlsplit, unquote
 
@@ -12,7 +12,8 @@ def build():
     OUTPUT.mkdir(parents=True, exist_ok=True)
     for name in ("index.html", "styles.css", "app.js", "engine.js", "wordle_wasm.js", "words.js", "icon.svg"):
         copy2(ROOT / "web" / name, OUTPUT / name)
-    copytree(ROOT / "data", OUTPUT / "data", dirs_exist_ok=True)
+    # 정답 목록 원본(*_answers.txt, curated_*.txt)은 배포본에 넣지 않습니다. 게임은 words.js의 가려진 목록을 씁니다.
+    copytree(ROOT / "data", OUTPUT / "data", dirs_exist_ok=True, ignore=ignore_patterns("*_answers.txt", "curated_*.txt"))
     # 배포본에서는 data/가 index.html과 같은 폴더에 있으므로 링크 경로를 바꿈
     index = OUTPUT / "index.html"
     index.write_text(

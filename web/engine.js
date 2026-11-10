@@ -38,6 +38,23 @@ function makeCode(mode, lang, id1, id2 = 0) {
 }
 function puzzleCode(language, word) { return makeCode('classic', language, wordId(word)); }
 
+// words.js의 출제 목록은 XOR + base64로 가려져 있습니다(scripts/bundle_data.py). 암호가 아니라 가림막입니다.
+const ANSWER_SEED = 0x2B7E1516; // bundle_data.py의 SEED와 같아야 합니다.
+function keystream(n) {
+  const out = new Uint8Array(n);
+  for (let i = 0, x = ANSWER_SEED; i < n; i++) {
+    x = (x ^ x << 13) >>> 0; x = (x ^ x >>> 17) >>> 0; x = (x ^ x << 5) >>> 0;
+    out[i] = x & 0xFF;
+  }
+  return out;
+}
+function decodeAnswers(data) {
+  return Object.fromEntries(['ko', 'en'].map(lang => {
+    const bytes = Uint8Array.from(atob(data[lang].answers), c => c.charCodeAt(0)), key = keystream(bytes.length);
+    return [lang, {answers: new TextDecoder().decode(bytes.map((b, i) => b ^ key[i])).split('\n')}];
+  }));
+}
+
 // 출제 목록 전체를 코드 → 문제 맵으로 만듭니다. 해시가 겹치면 바로 실패시킵니다.
 function createPuzzles(data) {
   const puzzles = new Map();
@@ -127,4 +144,4 @@ function keyboardStatus(rows, target) {
   return map;
 }
 // Node 테스트에서 불러올 수 있도록 내보냅니다.
-if (typeof module !== 'undefined') module.exports = {splitWord, judge, puzzleCode, createPuzzles, MODES, NAMES, namePuzzles, themedPuzzle, resolvePuzzle, submitGuess, keyboardStatus};
+if (typeof module !== 'undefined') module.exports = {splitWord, judge, puzzleCode, decodeAnswers, createPuzzles, MODES, NAMES, namePuzzles, themedPuzzle, resolvePuzzle, submitGuess, keyboardStatus};
