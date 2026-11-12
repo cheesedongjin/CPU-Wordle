@@ -4,21 +4,20 @@
 
 ## 전체 구조
 
-```
-src/wordle.c ──(scripts/build_wasm.py, Zig clang)──▶ web/wordle_wasm.js  (WebAssembly를 base64로 담은 파일)
-                                                          │
-data/*.txt ──(scripts/bundle_data.py)──▶ web/words.js     │
-                                              │           │
-web/engine.js   C 함수를 불러와 JS 값으로 바꿔 주는 연결부 + 이름 후보 데이터
-       │
-web/app.js      화면: 설정 → 문제 시작 → 입력 → 그리기
-```
+빌드할 때 두 종류의 파일을 만듭니다.
 
-| 맡는 일 | 위치 |
+- **게임 규칙:** `scripts/build_wasm.py`가 Zig clang으로 `src/wordle.c`를 컴파일합니다. 결과는 WebAssembly를 base64로 담은 `web/wordle_wasm.js`입니다.
+- **단어 데이터:** `scripts/bundle_data.py`가 `data/*.txt`를 `web/words.js`로 묶습니다.
+
+브라우저에서는 `web/app.js`가 입력을 받고, `web/engine.js`를 통해 C 규칙을 실행한 뒤 결과를 화면에 표시합니다.
+
+| 파일 | 역할 |
 |---|---|
-| 게임 규칙 전부: 자모 분해, 판정, 문제 코드 만들기·해석, 모드별 기회 수, 해커 가림, 탐정 승리 조건, 키보드 집계 | `src/wordle.c` (C) |
-| C 함수 호출과 값 변환, 사전·이름 후보에서 단어 찾기, NFC 정규화 | `web/engine.js` (JS) |
-| 화면 그리기, 입력 이벤트, 칸 크기 맞춤 | `web/app.js` (JS) |
+| `src/wordle.c` | 게임 규칙 계산 |
+| `web/engine.js` | C 함수와 JavaScript 연결, 단어 검색 |
+| `web/app.js` | 입력 처리와 화면 표시 |
+
+`src/wordle.c`는 자모 분해, 판정, 문제 코드 생성·해석, 모드별 기회 수와 승리 조건, 해커 모드 가림, 키보드 집계를 담당합니다. `web/engine.js`는 C와 주고받는 값을 변환하고, 사전·이름 후보 검색과 NFC 정규화를 처리합니다. `web/app.js`는 설정 변경, 입력 이벤트, 화면 그리기와 칸 크기 조절을 담당합니다.
 
 - 서버가 없습니다. C는 WebAssembly로 컴파일되어 `web/wordle_wasm.js` 안에 base64로 들어 있어서, `index.html`을 파일로 열어도(`file://`) 동작합니다.
 - C 코드는 표준 라이브러리를 쓰지 않습니다. 그래서 브라우저용(wasm32-freestanding)과 테스트용(네이티브) 모두 같은 소스로 컴파일됩니다.
@@ -82,11 +81,13 @@ return hash ^ hash >> 16;
 - 시작값에 `WD_SALT`를 섞고 끝에서 비트를 한 번 더 섞습니다. 공개 사전을 일반 FNV-1a로 해시해 코드와 맞춰 보는 방법을 막기 위한 가벼운 장치이며, 암호는 아닙니다. 솔트를 바꾸면 기존 코드가 모두 무효가 되므로 접두사 버전도 함께 올립니다.
 - `wd_make_code`는 ID를 대문자 16진수 8자리로 붙여 코드 문자열을 만듭니다.
 
-| 모드 | 형식 | 예 |
-|---|---|---|
-| 기본 | `CW2-언어-단어ID` | `CW2-EN-F123CC0B` (apple) |
-| 해커 | `CWH2-언어-단어ID` | |
-| 탐정 | `CWD2-언어-이름ID-이름ID` | |
+| 모드 | 코드 형식 |
+|---|---|
+| 기본 | `CW2-언어-단어ID` |
+| 해커 | `CWH2-언어-단어ID` |
+| 탐정 | `CWD2-언어-이름ID-이름ID` |
+
+예: 기본 모드의 영어 정답 `apple`은 `CW2-EN-F123CC0B`입니다.
 
 - `wd_parse_code`는 형식이 정확히 맞을 때만 모드·언어·ID를 돌려줍니다. 접두사를 `CWH2` → `CWD2` → `CW2` 순서로 확인합니다. 예전 `CW1` 코드는 열리지 않습니다. 소문자 16진수, 남는 글자, 모자란 자릿수는 모두 실패입니다.
 - 해석한 ID로 실제 단어를 찾는 일은 데이터가 있는 JS([web/engine.js:112](web/engine.js:112) `resolvePuzzle`)가 합니다. 탐정 코드는 두 이름이 후보에 있고 서로 다를 때만 열립니다.
@@ -167,15 +168,26 @@ const take = count => [...new Int32Array(wasm.memory.buffer, wasm.wd_out(), coun
 
 ## 8. 빌드와 테스트
 
-| 파일 | 역할 |
-|---|---|
-| [scripts/build_wasm.py](scripts/build_wasm.py) | `src/wordle.c`를 WebAssembly로 컴파일해 `web/wordle_wasm.js`를 만듭니다. C를 고친 뒤 꼭 실행하세요. |
-| [scripts/test_c.py](scripts/test_c.py) | [tests/test_engine.c](tests/test_engine.c)를 네이티브로 컴파일해 C 규칙을 직접 검사합니다. |
-| [tests/test_local.cjs](tests/test_local.cjs) | Node에서 wasm을 불러 JS 연결부와 화면 흐름을 검사합니다. |
-| [scripts/bundle_data.py](scripts/bundle_data.py) | `data/`의 단어 목록을 `web/words.js`로 묶습니다. 출제 목록은 XOR + base64로 가리고, [web/engine.js:51](web/engine.js:51) `decodeAnswers`가 풉니다. |
-| [scripts/build_data.py](scripts/build_data.py) | `.cache`의 원본 사전에서 `data/` 목록을 다시 만듭니다. |
-| [scripts/build_pages.py](scripts/build_pages.py) | GitHub Pages용 파일을 `build/pages`에 모으고 링크를 검사합니다. |
-| [.github/workflows/ci.yml](.github/workflows/ci.yml) | C 테스트 → wasm·사전 번들이 커밋된 파일과 같은지 확인 → JS 테스트 → Pages 빌드·배포 |
+**빌드**
+
+- [scripts/build_wasm.py](scripts/build_wasm.py): `src/wordle.c`를 WebAssembly로 컴파일해 `web/wordle_wasm.js`를 만듭니다. C를 수정한 뒤 실행합니다.
+- [scripts/build_data.py](scripts/build_data.py): `.cache`의 원본 사전에서 `data/` 목록을 다시 만듭니다.
+- [scripts/bundle_data.py](scripts/bundle_data.py): `data/`의 단어 목록을 `web/words.js`로 묶습니다. 출제 목록은 XOR + base64로 가리고, `web/engine.js`의 `decodeAnswers`가 풉니다.
+- [scripts/build_pages.py](scripts/build_pages.py): GitHub Pages용 파일을 `build/pages`에 모으고 링크를 검사합니다.
+
+**테스트**
+
+- [scripts/test_c.py](scripts/test_c.py): [tests/test_engine.c](tests/test_engine.c)를 네이티브로 컴파일해 C 규칙을 검사합니다.
+- [tests/test_local.cjs](tests/test_local.cjs): Node에서 wasm을 불러 JS 연결부와 화면 흐름을 검사합니다.
+
+**자동 검사와 배포**
+
+[.github/workflows/ci.yml](.github/workflows/ci.yml)에서 다음 순서로 실행합니다.
+
+1. C 테스트
+2. 다시 만든 wasm·사전 번들이 커밋된 파일과 같은지 확인
+3. JS 테스트
+4. Pages 빌드·배포
 
 컴파일러는 Zig에 들어 있는 clang을 씁니다. CI와 같은 버전을 설치하세요.
 
