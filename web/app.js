@@ -84,16 +84,20 @@ function renderBoard(){
   const key=JSON.stringify([n,rows,preview,g?.status,g?.mode]);if(key===lastBoard)return;lastBoard=key;
   const board=$('board');board.className=g?.mode==='detective'?'detective-boards':'board-group';board.replaceChildren();
   for(let target=0;target<(g?.answers?.length||1);target++){
+    // 맞힌 인물은 정답 줄까지의 기록과 키보드 상태를 그대로 유지합니다.
+    const solvedAt=g?.mode==='detective'?rows.findIndex(row=>row.results[target].every(result=>result===2)):-1;
+    const targetRows=solvedAt<0?rows:rows.slice(0,solvedAt+1);
+    const showPreview=solvedAt<0&&g?.status==='active';
     const section=node('section',undefined,'board');section.setAttribute('style',`--cols:${n}`);
     if(g?.mode==='detective'){const solved=g.solved[target];const title=node('h3',undefined,`board-title${solved?' solved':''}`);title.append(node('span',`인물 ${'AB'[target]}`),node('strong',solved?g.answers[target]:'미확인'));section.append(title);}
     for(let r=0;r<MODES[g?.mode||mode].attempts;r++){
-      const row=node('div',undefined,'board-row');if(r===rows.length&&g?.status==='active')row.classList.add('current');
+      const row=node('div',undefined,'board-row');if(r===targetRows.length&&showPreview)row.classList.add('current');
       // 제출한 줄은 판정 색, 현재 줄은 입력 미리보기, -1은 해커 모드의 가린 칸
       for(let c=0;c<n;c++){
-        const value=rows[r]?.tokens[c]??(r===rows.length?preview[c]:'')??'';
-        const result=rows[r]?.results[target][c];
+        const value=targetRows[r]?.tokens[c]??(r===targetRows.length&&showPreview?preview[c]:'')??'';
+        const result=targetRows[r]?.results[target][c];
         const tile=node('span',value,'tile');
-        if(rows[r]){tile.classList.add(result===-1?'corrupted':['absent','present','correct'][result]);tile.setAttribute('aria-label',result===-1?`${value}: 판정 미공개`:`${value}: ${['없는 글자','다른 위치에 있음','정확한 위치'][result]}`);}
+        if(targetRows[r]){tile.classList.add(result===-1?'corrupted':['absent','present','correct'][result]);tile.setAttribute('aria-label',result===-1?`${value}: 판정 미공개`:`${value}: ${['없는 글자','다른 위치에 있음','정확한 위치'][result]}`);}
         else if(value)tile.classList.add('filled');row.append(tile);
       }
       section.append(row);
@@ -102,7 +106,7 @@ function renderBoard(){
       const status=node('section',undefined,'keyboard-status suspect-keyboard');
       status.append(node('h4',`인물 ${'AB'[target]} · 사용한 글자`));
       const keyboard=node('div',undefined,'keyboard');
-      fillKeyboard(keyboard,g.language,keyboardStatus(rows,target),`인물 ${'AB'[target]} · `);
+      fillKeyboard(keyboard,g.language,keyboardStatus(targetRows,target),`인물 ${'AB'[target]} · `);
       status.append(keyboard);section.append(status);
     }
     board.append(section);

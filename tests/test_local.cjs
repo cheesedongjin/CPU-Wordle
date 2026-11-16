@@ -196,3 +196,26 @@ test('Detective keyboards show independent evidence below each board', () => {
   page.run("mode='classic'; randomPuzzle()");
   assert.equal(page.elements.get('keyboard-status').hidden,false);
 });
+
+
+test('Solved detective boards and keyboards freeze while the other identity continues', () => {
+  for(const first of ['alice','james']){
+    const page=browser();
+    page.run("start(themedPuzzle('detective',namePuzzles('en').find(p=>p.answer==='alice'),namePuzzles('en').find(p=>p.answer==='james')))");
+    const target=first==='alice'?0:1,other=1-target;
+    const board=i=>page.elements.get('board').children[i];
+    const snapshot=i=>JSON.stringify(board(i));
+    const submit=word=>{page.elements.get('guess').value=word;page.elements.get('guess-form').fire('submit');};
+    submit(first);
+    const frozen=snapshot(target);
+    page.elements.get('guess').value='david';page.elements.get('guess').fire('input');
+    assert.equal(snapshot(target),frozen);
+    assert.equal(board(other).children[2].children[0].textContent,'d');
+    submit('david');
+    assert.equal(snapshot(target),frozen);
+    assert.equal(page.run('state.game.rows.length'),2);
+    submit(first==='alice'?'james':'alice');
+    assert.equal(snapshot(target),frozen);
+    assert.equal(page.run('state.game.won'),true);
+  }
+});

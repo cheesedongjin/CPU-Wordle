@@ -1,4 +1,5 @@
 """GitHub Pages에 올릴 정적 파일을 build/pages에 모읍니다(사전 출처 고지 포함)."""
+from hashlib import sha256
 from pathlib import Path
 from shutil import copy2, copytree, ignore_patterns
 from html.parser import HTMLParser
@@ -16,10 +17,15 @@ def build():
     copytree(ROOT / "data", OUTPUT / "data", dirs_exist_ok=True, ignore=ignore_patterns("*_answers.txt", "curated_*.txt"))
     # 배포본에서는 data/가 index.html과 같은 폴더에 있으므로 링크 경로를 바꿈
     index = OUTPUT / "index.html"
-    index.write_text(
-        index.read_text(encoding="utf-8").replace('href="../data/', 'href="./data/'),
-        encoding="utf-8",
-    )
+    html = index.read_text(encoding="utf-8").replace('href="../data/', 'href="./data/')
+    # HTML과 이전 캐시의 스크립트가 섞이지 않도록 내용별 주소를 사용합니다.
+    for name in ("styles.css", "app.js", "engine.js", "wordle_wasm.js", "words.js", "icon.svg"):
+        asset = OUTPUT / name
+        version = sha256(asset.read_bytes()).hexdigest()[:16]
+        versioned = f"{asset.stem}.{version}{asset.suffix}"
+        copy2(asset, OUTPUT / versioned)
+        html = html.replace(f'"./{name}"', f'"./{versioned}"')
+    index.write_text(html, encoding="utf-8")
     (OUTPUT / ".nojekyll").write_text("", encoding="utf-8")
 
     # 배포본 안의 상대 경로 링크가 모두 실제 파일을 가리키는지 확인
