@@ -75,7 +75,7 @@ function render() {
   $('result').hidden = !g || active;
   if (g && !active) $('result').replaceChildren(node('h3', g.won ? '정답입니다!' : '기회를 모두 사용했어요.'), node('p', `정답은 ${(g.answers || [g.answer]).map(a => `‘${a}’`).join(', ')}`));
   message(active ? (g.mode === 'detective' ? `두 사람의 이름을 찾아보세요. (${g.solved.filter(Boolean).length}/2명 확인)` : '단어를 입력해 정답을 찾아보세요.') : '새 문제를 만들거나 친구의 문제 코드를 입력하세요.');
-  renderBoard(); renderKeyboard(); preview(); fitBoard();
+  renderBoard(); renderKeyboard(); preview();
 }
 // 보드를 그립니다. 입력할 때마다 불리므로 상태가 같으면 건너뜁니다.
 function renderBoard(){
@@ -100,28 +100,6 @@ function renderBoard(){
     }
     board.append(section);
   }
-}
-// 보드·입력칸·키보드가 한 화면에 들어올 때까지 칸 크기(--tile)를 줄입니다.
-function fitBoard(){
-  const board=$('board'),game=$('game-theme');
-  if(typeof innerHeight!=='number'||!board.getBoundingClientRect)return;
-  const docTop=el=>el.getBoundingClientRect().top+scrollY,docBottom=el=>el.getBoundingClientRect().bottom+scrollY;
-  const wrap=document.querySelector('.board-wrap'),keys=document.querySelector('.keyboard-status');
-  const rows=MODES[state?.game?.mode||mode].attempts,topbar=document.querySelector('.topbar').offsetHeight;
-  board.style.setProperty('--tile','60px');
-  const first=board.querySelector('.tile');if(!first)return;
-  let tile=Math.min(60,Math.floor(first.getBoundingClientRect().width));
-  const gameTop=docTop(game);
-  let avail=innerHeight-12-gameTop;
-  if(avail<420)avail=innerHeight-topbar-20; // 위쪽 메뉴가 너무 크면 스크롤한 상태 기준으로 맞춤
-  const need=()=>Math.max(docBottom(wrap),docBottom(keys))-gameTop;
-  for(let i=0;i<5;i++){
-    board.style.setProperty('--tile',tile+'px');
-    const over=need()-avail;
-    if(over<=0||tile<=26)break;
-    tile=Math.max(26,tile-Math.ceil(over/rows));
-  }
-  board.style.setProperty('--tile',tile+'px');
 }
 const STATUS=['absent','present','correct'],STATUS_TEXT=['없는 글자','다른 위치에 있음','정확한 위치'];
 // 사용한 글자 키보드를 그립니다.
@@ -204,7 +182,6 @@ $('guess-form').addEventListener('submit', event => {
   $('guess').value = ''; render();
   if (g.status === 'active') $('guess').focus();
 });
-if(typeof addEventListener==='function')addEventListener('resize',fitBoard);
 $('help-open').addEventListener('click', () => $('dialog').showModal());
 $('dialog-close').addEventListener('click', () => $('dialog').close());
 updateSettings(); randomPuzzle();
