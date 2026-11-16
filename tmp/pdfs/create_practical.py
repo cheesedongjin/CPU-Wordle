@@ -31,8 +31,8 @@ def table(rows,widths):
  story.append(t)
  story.append(Spacer(1,8))
 
-p('CPU Wordle(가제) 프로젝트 설명','title')
-p('CPU Wordle(가제)은 한글과 영어 단어를 맞히는 웹 게임이다. 사용자가 단어를 입력하면 각 글자가 정답과 얼마나 일치하는지 색깔로 표시한다. 이 힌트를 이용해 제한된 횟수 안에 정답을 찾는다. 문제 코드를 공유하면 친구도 같은 문제를 풀 수 있다.')
+p('CPU Wordle 프로젝트 설명','title')
+p('CPU Wordle은 한글과 영어 단어를 맞히는 웹 게임이다. 사용자가 단어를 입력하면 각 글자가 정답과 얼마나 일치하는지 색깔로 표시한다. 이 힌트를 이용해 제한된 횟수 안에 정답을 찾는다. 문제 코드를 공유하면 친구도 같은 문제를 풀 수 있다.')
 h('1. 주요 기능과 게임 규칙')
 p('초록은 글자와 위치가 모두 일치한다는 뜻이고, 노랑은 글자는 있지만 위치가 다르다는 뜻이다. 회색은 해당 글자에 대응할 정답 글자가 남아 있지 않다는 뜻이다. 같은 글자가 반복되면 정답에 있는 개수만큼만 초록이나 노랑을 준다.')
 table([['모드','기회','규칙'],['기본','6번','단어 하나를 맞힌다.'],['해커','7번','오답마다 무작위 한 칸의 판정을 가린다. 입력한 글자는 보이며, 정답을 입력한 줄은 가리지 않는다.'],['탐정','공통 7번','이름 후보 100개 중 두 이름을 찾는다. 한 번의 입력을 두 정답과 동시에 비교하며, 두 이름을 모두 맞혀야 승리한다.']],[58,60,381])
@@ -83,6 +83,6 @@ p('web/engine.js와 web/app.js: C 계산 결과가 입력 처리와 게임 화�
 p('tests/test_engine.c와 tests/test_local.cjs: 다양한 입력에 어떤 결과를 기대하는지 구체적인 사례를 볼 수 있다. scripts/build_wasm.py는 C를 브라우저용 파일로 변환하는 과정을 참고할 때 유용하다.','small')
 def footer(c,d):
  c.setFont('KR',9);c.setFillColor(colors.HexColor('#666666'));c.drawCentredString(A4[0]/2,27,str(d.page))
-doc=SimpleDocTemplate(str(OUT),pagesize=A4,rightMargin=48,leftMargin=48,topMargin=43,bottomMargin=45,title='CPU Wordle(가제) 프로젝트 설명',author='')
+doc=SimpleDocTemplate(str(OUT),pagesize=A4,rightMargin=48,leftMargin=48,topMargin=43,bottomMargin=45,title='CPU Wordle 프로젝트 설명',author='')
 doc.build(story,onFirstPage=footer,onLaterPages=footer)
 print(OUT)

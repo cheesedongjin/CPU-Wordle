@@ -205,11 +205,6 @@ $('guess-form').addEventListener('submit', event => {
   if (g.status === 'active') $('guess').focus();
 });
 if(typeof addEventListener==='function')addEventListener('resize',fitBoard);
-// 이름 후보 목록은 바깥을 클릭하거나 Esc를 누르면 닫습니다.
-if(typeof addEventListener==='function'){
-  addEventListener('click',event=>{if(!$('name-candidates').contains(event.target))$('name-candidates').open=false;});
-  addEventListener('keydown',event=>{if(event.key==='Escape')$('name-candidates').open=false;});
-}
 $('help-open').addEventListener('click', () => $('dialog').showModal());
 $('dialog-close').addEventListener('click', () => $('dialog').close());
 updateSettings(); randomPuzzle();

@@ -81,10 +81,9 @@ body[data-mode=hacker] .panel{box-shadow:0 0 0 1px #4ef59a10,0 0 40px -18px #4ef
 .game-language{flex-shrink:0;font-size:12px;color:var(--faint)}
 .mode-description{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-left:10px;border-left:1px solid var(--line-strong)}
 .progress{flex-shrink:0;font-size:13px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--muted);background:var(--sunken);border:1px solid var(--line);padding:5px 12px;border-radius:999px}
-#name-candidates{position:relative;z-index:3;margin-top:10px;padding:8px 14px;background:var(--sunken);border:1px solid var(--line);border-radius:12px;font-size:13px;line-height:1.9}
-#name-candidates summary{cursor:pointer;color:var(--accent);font-weight:700}
-/* 목록은 보드 위에 떠서 열어도 배치가 바뀌지 않습니다. */
-#name-list{position:absolute;top:calc(100% + 6px);left:0;right:0;margin:0;padding:12px 16px;max-height:min(240px,45vh);overflow-y:auto;color:var(--muted);background:var(--paper-2);border:1px solid var(--line-strong);border-radius:12px;box-shadow:0 18px 40px -12px #000000cc}
+#name-candidates{margin-top:10px;padding:10px 14px;background:var(--sunken);border:1px solid var(--line);border-radius:12px;font-size:13px;line-height:1.9}
+#name-candidates-title{margin:0;color:var(--accent);font-size:13px;font-weight:700}
+#name-list{margin:6px 0 0;color:var(--muted);overflow-wrap:anywhere}
 
 /* 왼쪽은 보드, 오른쪽은 입력칸·키보드·설정 */
 .game-body{display:grid;grid-template-columns:minmax(0,1fr) minmax(300px,400px);gap:28px;align-items:start;margin-top:14px}
@@ -188,8 +187,6 @@ dialog::backdrop{background:#0008;backdrop-filter:blur(6px)}
 @keyframes pop{50%{transform:scale(1.07)}}
 @keyframes blink{50%{opacity:0}}
 
-/* 넓은 화면에서는 이름 목록이 입력칸·키보드를 가리지 않게 함 */
-@media(min-width:901px){#name-list{right:428px}}
 @media(max-width:900px){
   .game-body{grid-template-columns:1fr;gap:16px}
   .game-side{max-width:520px;width:100%;margin:auto}
