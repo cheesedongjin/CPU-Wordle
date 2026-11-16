@@ -13,23 +13,32 @@ const FINISHED = 1 << 8, WON = 1 << 9;
 
 // C의 입력 버퍼에 숫자들을 쓰고 개수를 돌려줍니다. 버퍼보다 길면 -1.
 function put(values) {
+  // 입력 공간에 들어갈 수 있는 개수인지 확인
   if (values.length > CAPACITY) return -1;
+  // C가 읽을 입력 공간에 숫자 목록을 복사
   new Uint32Array(wasm.memory.buffer, wasm.wd_in(), values.length).set(values);
   return values.length;
 }
+// C가 써 둔 결과를 필요한 개수만큼 읽어 목록으로 만듦
 const take = count => [...new Int32Array(wasm.memory.buffer, wasm.wd_out(), count)];
 const codePoints = text => Array.from(text, ch => ch.codePointAt(0));
 
 // 단어를 칸(자모 또는 알파벳) 배열로 바꿉니다. 허용되지 않는 글자가 있으면 null.
 function splitWord(text, lang) {
-  const len = put(codePoints(text.normalize('NFC'))); // NFC 정규화만 JS에서 처리
+  // 한글 표현을 맞추고 글자 번호를 C에 전달
+  const len = put(codePoints(text.normalize('NFC')));
+  // 전달에 성공했으면 C에서 글자를 분해
   const count = len < 0 ? -1 : wasm.wd_split(len, LANG[lang]);
+  // 실패면 null, 성공이면 결과 번호를 눈에 보이는 글자로 바꿈
   return count < 0 ? null : take(count).map(c => String.fromCodePoint(c));
 }
 // 판정: 2 = 글자·위치 일치, 1 = 글자만 일치, 0 = 없음
 function judge(answer, guess) {
+  // 정답과 추측을 글자 번호로 바꾸어 이어서 전달
   put([...answer, ...guess].map(t => t.codePointAt(0)));
+  // C의 정답 판정 코드를 실행
   wasm.wd_judge(guess.length);
+  // 입력 칸 수만큼 판정 결과를 읽음
   return take(guess.length);
 }
 const wordId = word => wasm.wd_hash(put(codePoints(word))) >>> 0;
@@ -129,9 +138,13 @@ function submitGuess(game, word, random = Math.random) {
   const solvedMask = answers.reduce((mask, _, i) => game.solved?.[i] ? mask | 1 << i : mask, 0);
   const status = wasm.wd_play(MODE_ID[game.mode || 'classic'], n, answers.length, game.rows.length, solvedMask, random());
   const flat = take(answers.length * n), results = answers.map((_, i) => flat.slice(i * n, (i + 1) * n));
+  // 정답별로 맞혔는지를 기록
   game.solved = answers.map((_, i) => Boolean(status & 1 << i));
+  // 이번 입력과 색깔 결과를 새 줄로 추가
   game.rows.push({tokens, tiles: results[0], results});
+  // 승리 여부를 기록
   game.won = Boolean(status & WON);
+  // 게임이 끝났으면 상태를 종료로 변경
   if (status & FINISHED) game.status = 'finished';
 }
 // 사용한 글자 집계(C의 wd_keyboard). target번째 정답 기준으로 글자 → 가장 좋은 판정 맵을 돌려줍니다.

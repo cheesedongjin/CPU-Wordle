@@ -48,10 +48,14 @@ int wd_split(const uint32_t *text, int len, int lang, uint32_t *out, int cap) {
             continue;
         }
         if (c < 0xAC00 || c >= 0xAC00 + 11172) return -1; /* 완성형 한글 음절만 허용 */
+        // 입력한 한글이 ‘가’에서 얼마나 떨어져 있는지 계산
         uint32_t s = c - 0xAC00;
+        // 첫 자음을 찾아 결과 목록에 넣을 준비
         uint32_t initial[2] = {INITIAL[s / 588], 0};       /* 588 = 21×28 */
         count = push(out, count, cap, initial);
+        // 앞 처리가 성공했으면 모음을 결과 목록에 추가
         if (count >= 0) count = push(out, count, cap, VOWEL[s % 588 / 28]);
+        // 이어서 받침을 추가하며, 받침이 없으면 추가하지 않음
         if (count >= 0) count = push(out, count, cap, FINAL[s % 28]);
         if (count < 0) return -1;
     }
@@ -64,14 +68,19 @@ void wd_judge(const uint32_t *answer, const uint32_t *guess, int n, int32_t *out
     if (n > 64) n = 64;
     /* 1단계: 같은 위치의 글자를 먼저 초록으로 확정 */
     for (int i = 0; i < n; i++) {
+        // 같은 자리의 글자가 같으면 초록, 다르면 우선 회색으로 기록
         out[i] = guess[i] == answer[i] ? WD_CORRECT : WD_ABSENT;
+        // 초록으로 맞힌 정답 칸은 이미 사용했다고 표시
         used[i] = out[i] == WD_CORRECT;
     }
     /* 2단계: 아직 쓰이지 않은 정답 칸이 있을 때만 노랑. 중복 글자가 정답보다 많이 노랗게 나오지 않습니다. */
     for (int i = 0; i < n; i++) {
+        // 초록 칸은 확인이 끝났으므로 다음 칸으로 이동
         if (out[i] == WD_CORRECT) continue;
         for (int j = 0; j < n; j++) {
+            // 아직 쓰지 않은 정답 칸에서 같은 글자를 찾음
             if (!used[j] && answer[j] == guess[i]) {
+                // 찾은 정답 칸을 사용 처리하고 입력 칸을 노랑으로 기록
                 used[j] = 1;
                 out[i] = WD_PRESENT;
                 break;
@@ -86,8 +95,11 @@ void wd_judge(const uint32_t *answer, const uint32_t *guess, int n, int32_t *out
    SALT를 바꾸면 이미 공유된 코드가 모두 무효가 되므로, 바꿀 때는 코드 버전(PREFIX)도 올리세요. */
 #define WD_SALT 0x6C3A91F5u
 uint32_t wd_hash(const uint32_t *word, int len) {
+    // 단어 번호 계산에 사용할 시작값을 준비
     uint32_t hash = 2166136261u ^ WD_SALT;
+    // 글자를 하나씩 읽어 숫자 계산에 반영
     for (int i = 0; i < len; i++) hash = (hash ^ word[i]) * 16777619u;
+    // 계산된 숫자를 더 섞어 최종 단어 번호를 만듦
     hash ^= hash >> 16; hash *= 0x85EBCA6Bu;
     hash ^= hash >> 13; hash *= 0xC2B2AE35u;
     return hash ^ hash >> 16;
@@ -115,11 +127,15 @@ static int append_hex(char *out, int at, uint32_t value) {
 
 /* 문제 코드 만들기: 기본 CW2-KO-XXXXXXXX, 해커 CWH2-…, 탐정 CWD2-언어-ID1-ID2 */
 int wd_make_code(int mode, int lang, uint32_t id1, uint32_t id2, char *out) {
+    // 먼저 기본·해커·탐정 중 모드 표시를 붙임
     int at = append(out, 0, PREFIX[mode]);
     out[at++] = '-';
+    // 한글 KO 또는 영어 EN 표시를 붙임
     at = append(out, at, LANG_CODE[lang]);
     out[at++] = '-';
+    // 첫 번째 정답의 번호를 8자리 문자로 붙임
     at = append_hex(out, at, id1);
+    // 탐정 모드는 두 번째 이름의 번호도 붙임
     if (mode == WD_DETECTIVE) {
         out[at++] = '-';
         at = append_hex(out, at, id2);
@@ -182,18 +198,27 @@ static int same(const uint32_t *a, const uint32_t *b, int n) {
  * 반환값: 맞힌 정답 비트 | WD_FINISHED | WD_WON */
 int wd_play(int mode, int n, int count, const uint32_t *answers, const uint32_t *guess,
             int rows_done, int solved_mask, double random, int32_t *results) {
+    // 모든 정답을 맞혔을 때의 표시를 준비
     int all = (1 << count) - 1;
     for (int i = 0; i < count; i++) {
+        // 각 정답과 이번 입력을 비교해 색깔을 계산
         wd_judge(answers + i * n, guess, n, results + i * n);
-        if (same(answers + i * n, guess, n)) solved_mask |= 1 << i; /* 한 번 맞힌 정답은 계속 맞힘 상태 */
+        // 이번에 맞힌 정답을 기존 성공 기록에 추가
+        if (same(answers + i * n, guess, n)) solved_mask |= 1 << i;
     }
     /* 해커: 오답이면 첫 보드의 무작위 한 칸을 가림(-1) */
+    // 해커 모드에서 오답일 때만 한 칸을 가림
     if (mode == WD_HACKER && !same(answers, guess, n)) {
+        // 임의의 숫자로 가릴 칸 번호를 선택
         int hidden = (int)(random * n);
+        // 선택한 칸을 숨김으로 기록; 범위를 벗어나면 마지막 칸 사용
         results[hidden < n ? hidden : n - 1] = WD_HIDDEN;
     }
+    // 지금까지 맞힌 정답 정보를 이번 결과에 담음
     int status = solved_mask & all;
+    // 정답을 모두 맞혔으면 승리와 종료를 표시
     if ((solved_mask & all) == all) status |= WD_WON | WD_FINISHED;
+    // 이번 입력까지 포함해 기회를 다 썼으면 종료
     if (rows_done + 1 >= wd_attempts(mode)) status |= WD_FINISHED;
     return status;
 }
@@ -203,12 +228,16 @@ int wd_play(int mode, int n, int count, const uint32_t *answers, const uint32_t 
 int wd_keyboard(const uint32_t *tokens, const int32_t *results, int cells, uint32_t *keys, int32_t *best) {
     int count = 0;
     for (int i = 0; i < cells; i++) {
+        // 숨겨진 색깔은 알 수 없으므로 키보드 정보에서 제외
         if (results[i] < 0) continue;
         int k = 0;
+        // 이 글자가 이미 키보드 기록에 있는지 찾음
         while (k < count && keys[k] != tokens[i]) k++;
+        // 처음 나온 글자이면 글자와 색깔을 새로 기록
         if (k == count) {
             keys[count] = tokens[i];
             best[count++] = results[i];
+        // 이미 있는 글자이면 더 좋은 힌트를 얻었을 때만 변경
         } else if (results[i] > best[k]) {
             best[k] = results[i];
         }
@@ -223,6 +252,7 @@ int wd_keyboard(const uint32_t *tokens, const int32_t *results, int cells, uint3
 #define WD_EXPORT(name) __attribute__((export_name(#name)))
 #define WD_BUF 1024
 
+// 입력을 적을 공간과 계산 결과를 적을 공간을 준비
 static uint32_t in_buf[WD_BUF];
 static int32_t out_buf[WD_BUF];
 
@@ -237,7 +267,10 @@ WD_EXPORT(wd_split) int js_split(int len, int lang) {
 }
 
 /* in: 정답 n칸 + 추측 n칸 → out: 판정 n개 */
-WD_EXPORT(wd_judge) void js_judge(int n) { wd_judge(in_buf, in_buf + n, n, out_buf); }
+WD_EXPORT(wd_judge) void js_judge(int n) {
+    // 앞의 정답과 뒤의 추측을 비교해 출력 공간에 결과를 적음
+    wd_judge(in_buf, in_buf + n, n, out_buf);
+}
 
 /* in: 단어 글자 len개 → 해시 */
 WD_EXPORT(wd_hash) uint32_t js_hash(int len) { return wd_hash(in_buf, len); }

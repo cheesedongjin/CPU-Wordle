@@ -179,8 +179,11 @@ $('guess').addEventListener('input', preview);
 $('guess-form').addEventListener('submit', event => {
   event.preventDefault();
   const g = state?.game;
-  if (composing || !g || g.status !== 'active') return; // 한글 조합 중에는 제출하지 않음
+  // 한글 조합 중이거나 진행 중인 게임이 아니면 제출을 멈춤
+  if (composing || !g || g.status !== 'active') return;
+  // 앞뒤 공백 제거, 한글 표현 통일, 영어 소문자 변환
   const word = $('guess').value.trim().normalize('NFC').toLowerCase();
+  // 단어를 실제로 비교할 자모 또는 알파벳 칸으로 나눔
   const tokens = splitWord(word, g.language);
   // 칸 수와 사전 확인을 통과해야 기회가 차감됩니다.
   if (!tokens || tokens.length !== g.length) {message(`${g.length}칸에 맞는 단어를 입력해 주세요.`, true); return;}
