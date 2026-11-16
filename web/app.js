@@ -98,35 +98,38 @@ function renderBoard(){
       }
       section.append(row);
     }
+    if(g?.mode==='detective'){
+      const status=node('section',undefined,'keyboard-status suspect-keyboard');
+      status.append(node('h4',`인물 ${'AB'[target]} · 사용한 글자`));
+      const keyboard=node('div',undefined,'keyboard');
+      fillKeyboard(keyboard,g.language,keyboardStatus(rows,target),`인물 ${'AB'[target]} · `);
+      status.append(keyboard);section.append(status);
+    }
     board.append(section);
   }
 }
 const STATUS=['absent','present','correct'],STATUS_TEXT=['없는 글자','다른 위치에 있음','정확한 위치'];
 // 사용한 글자 키보드를 그립니다.
 function renderKeyboard(){
-  const g=state?.game,lang=g?.language||language,split=g?.mode==='detective';
-  const rows=lang==='ko'?['ㅂㅈㄷㄱㅅㅛㅕㅑㅐㅔ','ㅁㄴㅇㄹㅎㅗㅓㅏㅣ','ㅋㅌㅊㅍㅠㅜㅡ']:['qwertyuiop','asdfghjkl','zxcvbnm'];
-  const shifted={'ㅂ':'ㅃ','ㅈ':'ㅉ','ㄷ':'ㄸ','ㄱ':'ㄲ','ㅅ':'ㅆ','ㅐ':'ㅒ','ㅔ':'ㅖ'};
-  $('keyboard-split-note').hidden=!split;
-  // 집계는 C(wd_keyboard)가 합니다. 탐정 모드는 인물별로 따로 집계해 키 하나를 반반 칠합니다.
-  const results=(split?[0,1]:[0]).map(target=>keyboardStatus(g?.rows||[],target));
-  const keyboard=$('keyboard');
-  const signature=JSON.stringify([lang,...results.map(map=>[...map])]);
+  const g=state?.game,lang=g?.language||language;
+  const detective=g?.mode==='detective';
+  $('keyboard-status').hidden=detective;
+  if(detective)return;
+  fillKeyboard($('keyboard'),lang,keyboardStatus(g?.rows||[],0));
+}
+function fillKeyboard(keyboard,lang,result,prefix=''){
+  const signature=JSON.stringify([lang,[...result]]);
   if(keyboard.dataset.signature===signature)return;
   keyboard.dataset.signature=signature;
-  keyboard.setAttribute('aria-label',`${lang==='ko'?'두벌식':'QWERTY'} 글자 사용 현황`);
+  keyboard.setAttribute('aria-label',`${prefix}${lang==='ko'?'두벌식':'QWERTY'} 글자 사용 현황`);
   keyboard.replaceChildren();
+  const rows=lang==='ko'?['ㅂㅈㄷㄱㅅㅛㅕㅑㅐㅔ','ㅁㄴㅇㄹㅎㅗㅓㅏㅣ','ㅋㅌㅊㅍㅠㅜㅡ']:['qwertyuiop','asdfghjkl','zxcvbnm'];
+  const shifted={'ㅂ':'ㅃ','ㅈ':'ㅉ','ㄷ':'ㄸ','ㄱ':'ㄲ','ㅅ':'ㅆ','ㅐ':'ㅒ','ㅔ':'ㅖ'};
   function keyLabel(token,extra=''){
-    const values=results.map(map=>map.get(token));
+    const value=result.get(token);
     const label=node('span',token.toUpperCase(),`keyboard-letter${extra}`);
-    if(split){
-      const [a,b]=values.map(v=>STATUS[v]||'unused');
-      label.classList.add('split',`a-${a}`,`b-${b}`);
-      label.setAttribute('aria-label',`${token.toUpperCase()}: 인물 A ${STATUS_TEXT[values[0]]||'아직 사용하지 않음'}, 인물 B ${STATUS_TEXT[values[1]]||'아직 사용하지 않음'}`);
-    }else{
-      if(STATUS[values[0]])label.classList.add(STATUS[values[0]]);
-      label.setAttribute('aria-label',`${token.toUpperCase()}: ${STATUS_TEXT[values[0]]||'아직 사용하지 않음'}`);
-    }
+    if(STATUS[value])label.classList.add(STATUS[value]);
+    label.setAttribute('aria-label',`${prefix}${token.toUpperCase()}: ${STATUS_TEXT[value]||'아직 사용하지 않음'}`);
     return label;
   }
   for(const letters of rows){

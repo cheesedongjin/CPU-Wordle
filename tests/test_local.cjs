@@ -181,12 +181,18 @@ test('Length choices stop at seven cells in both languages', () => {
     assert.equal(page.run('length'),5);
   }
 });
-test('Detective keyboard reports both suspects at once', () => {
+test('Detective keyboards show independent evidence below each board', () => {
   const page=browser();
   page.run("start(themedPuzzle('detective',namePuzzles('en').find(p=>p.answer==='alice'),namePuzzles('en').find(p=>p.answer==='james')))");
   page.run("$('guess').value='james'");page.elements.get('guess-form').fire('submit');
-  const [,a,b]=JSON.parse(page.elements.get('keyboard').dataset.signature);
+  const boards=page.elements.get('board').children;
+  const keyboards=boards.map(board=>board.children.at(-1).children[1]);
+  const [a,b]=keyboards.map(keyboard=>JSON.parse(keyboard.dataset.signature)[1]);
   assert.deepEqual(Object.fromEntries(a).j,0);
   assert.deepEqual(Object.fromEntries(b).j,2);
-  assert.equal(page.elements.get('keyboard-split-note').hidden,false);
+  assert.equal(page.elements.get('keyboard-status').hidden,true);
+  page.elements.get('guess').value='alice';page.elements.get('guess').fire('input');
+  assert.equal(page.elements.get('board').children[1].children.at(-1).children[1].dataset.signature,keyboards[1].dataset.signature);
+  page.run("mode='classic'; randomPuzzle()");
+  assert.equal(page.elements.get('keyboard-status').hidden,false);
 });
