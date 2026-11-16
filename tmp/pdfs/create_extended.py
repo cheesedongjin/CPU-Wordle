@@ -1,0 +1,121 @@
+from pathlib import Path
+from reportlab.platypus import PageBreak
+import textwrap
+
+source=Path(__file__).with_name('create_practical.py').read_text(encoding='utf-8')
+exec(source.split("p('CPU Wordle 프로젝트 설명','title')")[0])
+OUT=ROOT/'output/pdf/CPU_Wordle_핵심_코드_설명.pdf'
+styles['code'].fontSize=8.5
+styles['code'].leading=12
+def excerpt(file,start,end):
+ s=(ROOT/file).read_text(encoding='utf-8')
+ a=s.index(start); b=s.index(end,a)
+ snippet=textwrap.dedent(s[a:b].rstrip())
+ lines=[]
+ for line in snippet.splitlines():
+  if '/*' in line: line=line.split('/*')[0].rstrip()
+  if '//' in line: line=line.split('//')[0].rstrip()
+  if line.strip():lines.append(line)
+ code('\n'.join(lines))
+def page():story.append(PageBreak())
+def loc(s):p(s,'small')
+
+p('CPU Wordle 핵심 코드 설명','title')
+p('CPU Wordle은 입력한 단어를 정답과 비교해 색깔 힌트를 제공하는 게임이다. 화면은 HTML·CSS·JavaScript로 구성하고, 규칙은 C로 작성해 WebAssembly 형태로 브라우저에서 실행한다. 게임의 핵심 동작부터 시작해 모드별 기능, 입력 처리, 문제 공유, 웹 연결 순서로 설명한다.')
+h('1. 정답 판정: 글자와 위치 비교')
+loc('src/wordle.c · wd_judge')
+excerpt('src/wordle.c','    for (int i = 0; i < n; i++) {\n        out[i]', '\n}\n\n/* 단어 ID')
+p('판정은 두 단계로 이루어진다. 첫 번째 반복문은 같은 위치의 글자를 비교한다. guess[i]는 입력의 i번째 글자, answer[i]는 정답의 i번째 글자다. 같으면 out[i]에 WD_CORRECT(초록)를 저장하고, 다르면 우선 WD_ABSENT(회색)를 저장한다.')
+p('used 배열은 정답의 각 칸이 이미 판정에 쓰였는지 기록한다. 초록으로 확정한 칸은 먼저 사용한 것으로 표시한다. 두 번째 반복문은 초록 칸을 건너뛰고, 아직 사용하지 않은 정답 칸 중 같은 글자를 찾는다. 찾으면 WD_PRESENT(노랑)를 저장하고 그 정답 칸을 사용 처리한다.')
+p('for는 칸을 반복해서 확인하고, if는 조건에 따라 실행 여부를 결정한다. continue는 현재 칸을 건너뛰고, break는 일치하는 정답 칸을 하나 찾았을 때 안쪽 반복을 끝낸다. 배열은 글자나 판정 값을 순서대로 담는 목록이다.')
+p('예: 정답 apple / 입력 allee → 초록·노랑·회색·회색·초록. 정답에는 l이 한 개이므로 첫 l만 노랑이다. e는 마지막 칸이 초록으로 먼저 확정되어 앞의 e는 회색이다. 색깔로 글자의 위치와 개수를 함께 추리할 수 있다.')
+
+page()
+h('2. 게임 진행: 한 번의 입력과 승패 처리')
+loc('src/wordle.c · wd_play, wd_attempts')
+excerpt('src/wordle.c','    int all = (1 << count) - 1;', '    /* 해커:')
+excerpt('src/wordle.c','    int status = solved_mask & all;', '\n}\n\n/* 사용한 글자')
+p('wd_judge가 한 줄의 색깔을 계산한다면, wd_play는 입력 한 번의 전체 결과를 계산한다. 정답 개수만큼 판정을 반복하고, 맞힌 정답을 기록한 뒤 승리 여부와 남은 기회를 확인한다. 기본·해커 모드는 정답이 하나, 탐정 모드는 두 개다.')
+p('answers에는 정답들을 이어 붙여 저장한다. 한 정답이 n칸일 때 answers + i * n은 i번째 정답의 시작 위치다. results도 같은 방식으로 정답별 판정 결과를 나누어 저장한다. 하나의 판정 함수를 반복 호출하므로 두 보드에 같은 비교 규칙을 적용할 수 있다.')
+p('rows_done은 이미 제출한 줄 수다. 여기에 이번 입력 1회를 더한 값이 허용 횟수에 도달하면 게임을 끝낸다. wd_attempts는 기본 모드에 6번, 나머지 모드에 7번을 반환한다. 정답을 모두 맞히면 승리와 종료를 함께 기록한다.')
+h('3. 탐정 모드: 두 정답을 따로 기억하기')
+p('solved_mask는 정답별 성공 여부를 작은 숫자 하나에 담는다. 숫자를 이진수로 보았을 때 첫 번째 자리는 정답 A, 두 번째 자리는 정답 B의 성공 여부를 나타낸다. 1 << i는 i번째 정답에 해당하는 자리를 선택한다.')
+p('A를 맞히면 01, B를 맞히면 10, 둘 다 맞히면 11이 된다. |= 연산은 이전에 맞힌 기록을 유지하면서 새로 맞힌 정답을 추가한다. A를 먼저 맞히고 다음 입력에서 B를 맞혀도 두 기록이 합쳐져 승리한다.')
+p('all은 필요한 정답을 모두 맞힌 상태다. 정답이 두 개면 (1 << 2) - 1은 이진수 11이다. (solved_mask & all) == all은 필요한 성공 표시가 모두 켜졌는지 확인한다. WD_WON과 WD_FINISHED는 승리·종료를 표시하는 별도 값이며, JavaScript가 이 결과를 읽어 화면 상태를 바꾼다.')
+
+page()
+h('4. 한글 분해: 자음과 모음을 게임 칸으로 변환')
+loc('src/wordle.c · wd_split')
+excerpt('src/wordle.c','        uint32_t s = c - 0xAC00;', '        if (count < 0)')
+p('한글은 한 글자 안에 자음과 모음이 함께 들어 있으므로 비교 전에 자모로 나눈다. 유니코드는 컴퓨터가 문자를 숫자로 구분하는 체계다. 완성형 한글은 초성·중성·종성 조합 순서대로 배치되어 있어 나눗셈과 나머지 연산으로 각 구성 요소를 찾을 수 있다.')
+p('0xAC00은 ‘가’의 코드 값이다. 이를 빼면 ‘가’부터 센 순서 s가 된다. 초성 하나에 중성 21개와 종성 28가지가 조합되므로 588(21×28)로 나눈 몫이 초성 위치다. s % 588 / 28은 중성 위치, s % 28은 종성 위치다. 종성 28가지에는 받침이 없는 경우도 포함한다.')
+p('INITIAL·VOWEL·FINAL은 자모를 저장한 배열이다. push는 찾은 자모를 결과 배열에 추가한다. ㅘ는 ㅗ+ㅏ, 겹받침 ㄳ은 ㄱ+ㅅ으로 나누고 ㅐ와 쌍자음은 한 칸으로 처리한다. 사과는 ㅅ, ㅏ, ㄱ, ㅗ, ㅏ의 다섯 칸이 된다. count는 현재까지 채운 칸 수다.')
+h('5. 해커 모드: 무작위 한 칸의 판정 가리기')
+loc('src/wordle.c · wd_play')
+excerpt('src/wordle.c','    if (mode == WD_HACKER', '    int status =')
+p('조건문은 해커 모드이면서 입력이 정답과 다른 경우에 실행된다. &&는 두 조건을 모두 만족해야 한다는 뜻이고, !same은 정답과 같지 않다는 뜻이다. 기본 판정을 계산한 뒤 선택한 칸만 WD_HIDDEN으로 바꾼다.')
+p('random은 JavaScript에서 전달한 0 이상 1 미만의 난수다. 여기에 칸 수 n을 곱하고 정수로 바꾸면 0부터 n-1 사이의 칸 번호를 얻는다. 예를 들어 n이 5이고 random이 0.6이면 hidden은 3이다. 배열 번호는 0부터 시작하므로 네 번째 칸이다.')
+p('hidden < n ? hidden : n - 1은 계산한 위치가 범위 안이면 그대로 쓰고, 아니면 마지막 칸을 선택한다. 화면은 WD_HIDDEN 값을 줄무늬로 표시한다. 글자는 보이지만 판정 색은 가려져 일부 단서만으로 추리하게 된다. 정답인 줄에는 가림을 적용하지 않는다.')
+
+page()
+h('6. 키보드 표시: 글자별로 얻은 힌트 모으기')
+loc('src/wordle.c · wd_keyboard')
+excerpt('src/wordle.c','    for (int i = 0; i < cells; i++) {', '    return count;\n}\n\n/* ── WebAssembly')
+p('보드에는 입력한 순서대로 결과가 쌓이고, 키보드에는 같은 글자의 정보를 모아서 보여 준다. tokens는 입력했던 글자 목록, results는 각 글자의 판정이다. keys에는 지금까지 확인한 서로 다른 글자를, best에는 각 글자의 가장 좋은 판정을 저장한다.')
+p('처음 나온 글자면 목록에 추가하고, 이미 있는 글자면 이전 판정보다 높은 값일 때 갱신한다. 판정 값은 회색 0, 노랑 1, 초록 2이므로 더 큰 값을 남기면 된다. 이전에 초록이었던 글자를 다른 위치에 넣어 회색이 나와도 키보드의 초록 정보는 유지된다.')
+p('results[i]가 음수인 가려진 칸은 집계에서 건너뛴다. 탐정 모드에서는 정답 A와 B를 기준으로 각각 집계한다. 화면에서 키 왼쪽 절반은 A, 오른쪽 절반은 B의 색으로 표시해 두 정답의 단서를 함께 확인할 수 있다.')
+h('7. 입력 처리: 완성된 단어를 확인한 뒤 판정하기')
+loc('web/app.js · 입력 폼 제출 처리 · JavaScript')
+excerpt('web/app.js',"  if (composing || !g || g.status !== 'active')", '  // 칸 수와 사전 확인')
+p('composing은 한글 입력기가 글자를 조합하고 있는지 나타낸다. 한글 입력이 끝나고 게임이 진행 중일 때 단어를 처리한다. trim은 앞뒤 공백을 제거하고, normalize(\'NFC\')는 조합 방식이 다른 한글을 같은 형태로 맞추며, toLowerCase는 영어 대문자를 소문자로 통일한다.')
+p('splitWord는 단어를 자모 또는 알파벳 칸으로 나눈다. 이어서 실제 칸 수가 문제 길이와 같은지, 사전에 있는 단어인지 확인한다. 탐정 모드는 일반 사전 대신 이름 후보 목록을 사용한다. 확인을 통과한 입력만 submitGuess에 전달하므로 수정이 필요한 입력은 기회를 그대로 유지한다.')
+
+page()
+h('8. 문제 공유: 단어를 코드로 찾기')
+loc('src/wordle.c · wd_hash')
+excerpt('src/wordle.c','    uint32_t hash = 2166136261u', '\n}\n\n/* 모드별 기회')
+p('문제 코드는 모드·언어·단어 ID로 구성된다. 단어 ID는 단어의 글자 값을 순서대로 계산한 32비트 숫자다. 이렇게 입력을 일정한 숫자로 바꾸는 계산을 해시라고 한다. ^는 비트를 비교해 섞는 연산이고, >>는 비트를 오른쪽으로 이동하는 연산이다. 곱셈과 함께 사용해 글자들의 정보를 숫자에 반영한다.')
+p('같은 코드 버전에서 같은 단어를 넣으면 같은 ID가 나온다. 사전의 몇 번째 단어인지를 쓰는 방식이 아니므로, 사전 정렬 순서가 바뀌어도 같은 문제를 찾을 수 있다. 예를 들어 기본 영어 문제 apple의 코드는 CW2-EN-F123CC0B다.')
+loc('src/wordle.c · wd_make_code')
+excerpt('src/wordle.c','    int at = append(out, 0, PREFIX[mode]);', '\n}\n\n/* code[')
+p('append는 글자를 결과 문자열 뒤에 붙인다. PREFIX는 기본 CW2, 해커 CWH2, 탐정 CWD2 중 하나를 선택하고 LANG_CODE는 KO 또는 EN을 붙인다. append_hex는 단어 ID를 16진수 8자리로 기록한다. 탐정 모드에서는 두 이름을 찾아야 하므로 두 번째 ID도 붙인다.')
+p('코드를 열 때는 wd_parse_code가 모드·언어·ID를 읽고, JavaScript의 resolvePuzzle이 해당 ID를 단어 목록에서 찾는다. 탐정 모드는 이름 후보에서 서로 다른 두 이름을 찾는다. 따라서 코드 하나로 같은 정답과 모드를 다시 구성할 수 있다.')
+p('web/engine.js의 createPuzzles는 코드와 문제를 연결하는 Map을 만든다. Map은 키로 값을 찾는 자료구조로, 여기서는 코드가 키이고 정답·언어·길이 등이 값이다. 단어 데이터 구성 시 같은 코드가 겹치는지도 확인한다.')
+
+page()
+h('9. C와 웹 연결: 메모리로 입력과 결과 전달')
+loc('web/engine.js · put, take · JavaScript')
+excerpt('web/engine.js','function put(values)', 'const codePoints')
+p('C에서 계산한 결과를 화면에 보여 주려면 JavaScript와 C 사이에 데이터를 전달해야 한다. 이 프로젝트는 WebAssembly의 메모리에 입력과 출력 공간을 마련한다. 이런 임시 저장 공간을 버퍼라고 한다. JavaScript가 입력 버퍼에 숫자를 쓰고 C 함수를 호출하면, C가 출력 버퍼에 결과를 쓴다.')
+p('put은 values에 담긴 숫자들을 C의 입력 공간으로 복사한다. Uint32Array는 메모리를 32비트 양의 정수 목록으로 다루는 방식이다. take는 출력 공간에서 지정한 개수의 결과를 읽어 일반 JavaScript 배열로 만든다. 결과에는 가림 값 -1도 있으므로 부호 있는 정수를 읽는 Int32Array를 사용한다.')
+loc('src/wordle.c · WebAssembly 연결부')
+code('''static uint32_t in_buf[WD_BUF];
+static int32_t out_buf[WD_BUF];
+WD_EXPORT(wd_judge) void js_judge(int n) {
+    wd_judge(in_buf, in_buf + n, n, out_buf);
+}''')
+p('C의 in_buf는 입력, out_buf는 출력 버퍼다. 판정 요청에서는 정답 n칸과 추측 n칸을 입력 버퍼에 이어서 넣는다. in_buf + n은 추측이 시작되는 위치다. 계산 함수 wd_judge가 두 목록을 비교해 out_buf에 결과를 기록한다.')
+loc('web/engine.js · judge · JavaScript')
+excerpt('web/engine.js','function judge(answer, guess)', 'const wordId')
+p('JavaScript는 글자를 codePointAt(0)으로 유니코드 숫자로 바꾸고, put으로 전달한 다음 wasm.wd_judge를 호출한다. take로 읽은 0·1·2 판정 값은 화면에서 회색·노랑·초록으로 표시할 수 있다. C는 규칙을 계산하고 JavaScript는 데이터를 변환하고 화면과 연결하는 역할을 맡는다.')
+
+page()
+h('10. 한글 입력을 C 함수에 전달하는 과정')
+loc('web/engine.js · splitWord · JavaScript')
+excerpt('web/engine.js','function splitWord(text, lang)', '// 판정:')
+p('같은 한글도 입력 방식에 따라 내부 문자 구성이 달라질 수 있다. normalize(\'NFC\')로 표현을 맞춘 뒤 codePoints로 숫자 목록을 만든다. put은 이 목록을 입력 버퍼에 쓰고, wasm.wd_split은 C의 한글 분해 규칙을 실행한다.')
+p('C가 돌려준 count는 분해 결과의 칸 수다. take(count)로 그만큼의 숫자를 읽고 String.fromCodePoint로 다시 글자로 바꾼다. 결과는 사과의 경우 [ㅅ, ㅏ, ㄱ, ㅗ, ㅏ] 같은 배열이다. 한글 처리에 필요한 문자열 정리는 JavaScript가, 실제 분해 계산은 C가 맡는다.')
+h('11. 결과 기록과 화면 갱신')
+loc('web/engine.js · submitGuess 중 결과 기록 부분 · JavaScript')
+excerpt('web/engine.js','  game.solved = answers.map', '\n}\n// 사용한 글자 집계')
+p('C의 계산이 끝나면 JavaScript는 어떤 정답을 맞혔는지 game.solved에 기록한다. game.rows.push는 이번에 입력한 글자와 각 보드의 판정 결과를 한 줄의 기록으로 추가한다. 이렇게 쌓인 기록을 이용해 이전 추측들을 화면에 계속 표시한다.')
+p('status & WON은 승리 표시를 읽고, status & FINISHED는 종료 표시를 읽는다. Boolean은 숫자 결과를 참·거짓 값으로 바꾼다. 게임이 끝났다면 game.status를 finished로 설정하고, 화면은 결과와 정답을 보여 준다.')
+p('web/app.js에서는 submitGuess가 끝나면 입력칸을 비우고 render를 호출한다. render는 현재 게임 상태를 읽어 보드, 키보드, 진행 횟수, 결과 문구를 갱신한다. 계산 결과를 상태에 기록한 뒤 그 상태를 화면에 반영하는 구조다.')
+h('관련 파일')
+p('src/wordle.c: 정답 판정, 한글 분해, 모드별 진행, 공유 코드, 키보드 집계.<br/>src/wordle.h: 모드·판정·승패 표시 값과 함수 선언.<br/>web/engine.js: C 함수 호출, 값 변환, 단어 검색, 진행 기록.<br/>web/app.js: 입력 이벤트와 화면 표시.<br/>scripts/build_wasm.py: C 코드를 브라우저 실행용 파일로 변환.<br/>tests/test_engine.c: 각 게임 규칙의 구체적인 입력·결과 사례.','small')
+p('코드 조각은 해당 파일에서 필요한 부분을 발췌했다. 전체 함수의 앞뒤 처리와 호출 관계는 함수 이름으로 찾아볼 수 있다.','small')
+
+def footer(c,d):
+ c.setFont('KR',9);c.drawCentredString(A4[0]/2,27,str(d.page))
+SimpleDocTemplate(str(OUT),pagesize=A4,leftMargin=48,rightMargin=48,topMargin=38,bottomMargin=42,title='CPU Wordle 핵심 코드 설명').build(story,onFirstPage=footer,onLaterPages=footer)
+print(OUT)
