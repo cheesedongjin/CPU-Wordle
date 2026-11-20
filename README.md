@@ -18,6 +18,10 @@ CPU WORDLE은 한글과 영어 단어를 맞히는 웹 게임입니다. 단어�
 
 ## 2. 실행 방법
 
+### GitHub 저장소 접속
+
+[CPU-Wordle GitHub 저장소](https://github.com/cheesedongjin/CPU-Wordle)에서도 프로젝트에 접속할 수 있습니다. 소스 코드와 사용 안내를 확인하거나, **Code → Download ZIP**으로 프로젝트를 내려받아 아래 방법으로 게임을 실행할 수 있습니다.
+
 ### 파일을 직접 열기
 
 1. 저장소를 내려받습니다. ZIP으로 받았다면 먼저 압축을 풉니다.
